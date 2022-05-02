@@ -63,6 +63,10 @@ struct SlimeConfig {
     /// Sample distance
     #[structopt(short = "u", long, default_value = "1.")]
     sample_dist: f32,
+
+    /// Diffusion rate of the medium
+    #[structopt(short = "i", long, default_value = "1.")]
+    diffusion: f32,
 }
 
 struct SlimeApp {
@@ -163,13 +167,34 @@ impl SlimeSim {
     }
 
     pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
-        // Decay the medium, copying to back buffer
-        self.back
-            .medium
-            .data_mut()
-            .iter_mut()
-            .zip(self.front.medium.data())
-            .for_each(|(b, f)| *b = f * (1. - cfg.decay * dt * f.max(0.5)));
+        // Diffusion and decay
+        for y in 0..self.front.medium.height() {
+            for x in 0..self.front.medium.width() {
+                let mut sum = 0.;
+                let mut n_parts = 0;
+                for i in -1..=1 {
+                    for j in -1..=1 {
+                        if let Some(v) =
+                            sample_array_isize(&self.front.medium, j + x as isize, i + y as isize)
+                        {
+                            sum += v;
+                            n_parts += 1;
+                        }
+                    }
+                }
+
+                let avg = sum / n_parts as f32;
+
+                let pos = (x, y);
+                let center = self.front.medium[pos];
+
+                let diffuse = mix(center, avg, cfg.diffusion);
+
+                let decayed = (1. - cfg.decay) * diffuse;
+
+                self.back.medium[pos] = decayed;
+            }
+        }
 
         // Some premature optimization
         let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * dt);
@@ -185,7 +210,7 @@ impl SlimeSim {
             // Sample the grid
             let [left, center, right] = [left_sensor_rot, unit_rot, right_sensor_rot]
                 .map(|r| f.position + r * f.heading * cfg.sample_dist)
-                .map(|p| sample_array(&self.back.medium, p));
+                .map(|p| sample_array_vect(&self.back.medium, p));
 
             // Decide which way to go
             let lc = left.cmp(&center);
@@ -197,10 +222,10 @@ impl SlimeSim {
                 (Odr::Greater, Odr::Greater) => left_turn_rate,
                 (Odr::Less, Odr::Less) => right_turn_rate,
                 (Odr::Less, Odr::Greater) => unit_rot,
-                /*(Odr::Greater, Odr::Less) => 
-                    *[left_turn_rate, unit_rot, right_turn_rate]
-                    .choose(&mut rng)
-                    .unwrap(),*/
+                /*(Odr::Greater, Odr::Less) =>
+                *[left_turn_rate, unit_rot, right_turn_rate]
+                .choose(&mut rng)
+                .unwrap(),*/
                 _ => unit_rot,
             };
 
@@ -211,7 +236,7 @@ impl SlimeSim {
             let position = f.position + heading * cfg.move_speed * dt;
 
             // Drop some slime (or create a new particle if out of bounds)
-            if let Some(pos) = sample_array(&self.back.medium, position) {
+            if let Some(pos) = sample_array_vect(&self.back.medium, position) {
                 self.back.medium[pos] += cfg.deposit_rate * dt;
 
                 *b = SlimeParticle { position, heading };
@@ -224,7 +249,18 @@ impl SlimeSim {
     }
 }
 
-fn sample_array<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
+fn sample_array_isize<T: Copy>(arr: &Array2D<T>, x: isize, y: isize) -> Option<T> {
+    let bounds = |x: isize, w: usize| {
+        (x >= 0 && x < w as isize) //
+            .then(|| x as usize)
+    };
+
+    let pos = (bounds(x, arr.width())?, bounds(y, arr.height())?);
+
+    Some(arr[pos])
+}
+
+fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
     let bounds = |x: f32, w: usize| {
         (x.is_finite() && x >= 0. && x < w as f32) //
             .then(|| x as usize)
@@ -260,3 +296,9 @@ impl SlimeFactory {
         }
     }
 }
+
+
+fn mix(a: f32, b: f32, t: f32) -> f32 {
+    (1. - t) * a + t * b
+}
+
