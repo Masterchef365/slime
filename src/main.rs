@@ -1,6 +1,6 @@
 use idek::prelude::*;
 use idek_basics::{
-    draw_array2d::draw_grid,
+    draw_array2d::draw_grid_fuzzy,
     idek::{
         self,
         nalgebra::{Rotation2, Vector1, Vector2},
@@ -277,7 +277,7 @@ fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usi
 }
 
 fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
-    draw_grid(gb, &sim.frame().medium, |&v| [v; 3], 0.);
+    draw_grid_fuzzy(gb, &sim.frame().medium, |&v| [v; 3], 0.);
 }
 
 // Overengineered bullshit
