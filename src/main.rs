@@ -1,8 +1,3 @@
-use std::{
-    f32::consts::{PI, TAU},
-    time::Instant,
-};
-
 use idek::prelude::*;
 use idek_basics::{
     draw_array2d::draw_grid,
@@ -14,35 +9,78 @@ use idek_basics::{
     Array2D, GraphicsBuilder,
 };
 use rand::{distributions::Uniform, prelude::*};
+use std::f32::consts::TAU;
+use structopt::StructOpt;
 
 fn main() -> Result<()> {
-    launch::<_, SlimeApp>(Settings::default().vr_if_any_args())
+    let args = SlimeArgs::from_args();
+    launch::<SlimeArgs, SlimeApp>(Settings::default().vr(args.vr).args(args))
+}
+
+#[derive(Clone, Default, Debug, StructOpt)]
+struct SlimeArgs {
+    #[structopt(short = "t", long, default_value = "0.1")]
+    dt: f32,
+
+    #[structopt(short = "w", long, default_value = "400")]
+    width: usize,
+
+    #[structopt(short = "h", long, default_value = "400")]
+    height: usize,
+
+    #[structopt(short = "n", long, default_value = "2000")]
+    n_particles: usize,
+
+    #[structopt(long)]
+    vr: bool,
+
+    #[structopt(flatten)]
+    cfg: SlimeConfig,
+}
+
+#[derive(Clone, Default, Debug, StructOpt)]
+struct SlimeConfig {
+    /// Angle between adjacent sensors (radians)
+    #[structopt(short = "s", long, default_value = "0.26")]
+    sensor_spread: f32,
+
+    /// Turn rate, radians/time
+    #[structopt(short = "t", long, default_value = "0.26")]
+    turn_speed: f32,
+
+    /// Trail/slime decay rate
+    #[structopt(short = "d", long, default_value = "0.01")]
+    decay: f32,
+
+    /// Deposit rate for slime
+    #[structopt(short = "r", long, default_value = "0.1")]
+    deposit_rate: f32,
+
+    /// Slime movement speed
+    #[structopt(short = "m", long, default_value = "1.")]
+    move_speed: f32,
+
+    /// Sample distance
+    #[structopt(short = "u", long, default_value = "1.")]
+    sample_dist: f32,
 }
 
 struct SlimeApp {
     verts: VertexBuffer,
     indices: IndexBuffer,
-    cfg: SlimeConfig,
+    args: SlimeArgs,
     sim: SlimeSim,
     gb: GraphicsBuilder,
 }
 
-impl App for SlimeApp {
-    fn init(ctx: &mut Context, _: &mut Platform, _: ()) -> Result<Self> {
-        let cfg = SlimeConfig {
-            sensor_spread: PI / 12.,
-            turn_speed: PI / 12.,
-            decay: 0.1,
-            deposit_rate: 1.,
-            move_speed: 1.,
-            sample_dist: 1.,
-        };
-
-        let width = 400;
-        let height = 400;
-        let n_particles = 1000;
-
-        let sim = SlimeSim::new(width, height, n_particles, &mut rand::thread_rng());
+impl App<SlimeArgs> for SlimeApp {
+    fn init(ctx: &mut Context, _: &mut Platform, args: SlimeArgs) -> Result<Self> {
+        let sim = SlimeSim::new(
+            args.width,
+            args.height,
+            args.n_particles,
+            &mut rand::thread_rng(),
+        );
 
         let mut gb = GraphicsBuilder::new();
 
@@ -55,16 +93,15 @@ impl App for SlimeApp {
             verts,
             indices,
             gb,
-            cfg,
             sim,
+            args,
         })
     }
 
     fn frame(&mut self, ctx: &mut Context, platform: &mut Platform) -> Result<Vec<DrawCmd>> {
         // Timing
-        let dt = 1.;
-
-        self.sim.step(&self.cfg, dt, &mut rand::thread_rng());
+        self.sim
+            .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
 
         // Update view
         self.gb.clear();
@@ -90,22 +127,6 @@ struct SlimeData {
     slime: Vec<SlimeParticle>,
 }
 
-#[derive(Clone)]
-struct SlimeConfig {
-    /// Angle between adjacent sensors (radians)
-    sensor_spread: f32,
-    /// Turn rate, radians/time
-    turn_speed: f32,
-    /// Trail/slime decay rate
-    decay: f32,
-    /// Deposit rate for slime
-    deposit_rate: f32,
-    /// Slime movement speed
-    move_speed: f32,
-    /// Sample distance
-    sample_dist: f32,
-}
-
 struct SlimeSim {
     /// The buffer to be presented to the user and read by the sim
     front: SlimeData,
@@ -113,10 +134,6 @@ struct SlimeSim {
     back: SlimeData,
     /// Slime factory
     factory: SlimeFactory,
-}
-
-fn perp(v: Vector2<f32>) -> Vector2<f32> {
-    Vector2::new(-v.y, v.x)
 }
 
 fn unit_circ(a: f32) -> Vector2<f32> {
@@ -179,10 +196,8 @@ impl SlimeSim {
             let rotation = match (lc, cr) {
                 (Odr::Greater, Odr::Greater) => left_turn_rate,
                 (Odr::Less, Odr::Less) => right_turn_rate,
-                (Odr::Greater, Odr::Less) => {
-                    *[left_turn_rate, right_turn_rate].choose(&mut rng).unwrap()
-                }
-                _ => unit_rot,
+                (Odr::Greater, Odr::Less) => unit_rot,
+                _ => *[left_turn_rate, right_turn_rate].choose(&mut rng).unwrap(),
             };
 
             // Integrate rotation
