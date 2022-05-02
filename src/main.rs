@@ -166,7 +166,13 @@ impl SlimeSim {
         &self.front
     }
 
-    pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
+    pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, rng: impl Rng) {
+        self.diffuse_step(cfg, dt);
+        self.particle_step(cfg, dt, rng);
+        std::mem::swap(&mut self.front, &mut self.back);
+    }
+
+    fn diffuse_step(&mut self, cfg: &SlimeConfig, dt: f32) {
         // Diffusion and decay
         for y in 0..self.front.medium.height() {
             for x in 0..self.front.medium.width() {
@@ -188,14 +194,16 @@ impl SlimeSim {
                 let pos = (x, y);
                 let center = self.front.medium[pos];
 
-                let diffuse = mix(center, avg, cfg.diffusion);
+                let diffuse = mix(center, avg, cfg.diffusion * dt);
 
-                let decayed = (1. - cfg.decay) * diffuse;
+                let decayed = (1. - cfg.decay * dt) * diffuse;
 
                 self.back.medium[pos] = decayed;
             }
         }
+    }
 
+    fn particle_step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
         // Some premature optimization
         let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * dt);
         let right_sensor_rot = left_sensor_rot.inverse();
@@ -245,8 +253,6 @@ impl SlimeSim {
                 *b = self.factory.slime(&mut rng);
             }
         }
-
-        std::mem::swap(&mut self.front, &mut self.back);
     }
 }
 

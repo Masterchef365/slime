@@ -1,4 +1,5 @@
 cargo run --release --\
+    -w 1000 -h 1000\
     --decay 0.05\
     --n-particles 4000\
     --turn-speed 1.8\
