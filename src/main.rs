@@ -9,6 +9,7 @@ use idek_basics::{
     Array2D, GraphicsBuilder,
 };
 use rand::{distributions::Uniform, prelude::*};
+use rayon::prelude::*;
 use std::f32::consts::TAU;
 use structopt::StructOpt;
 
@@ -174,33 +175,40 @@ impl SlimeSim {
 
     fn diffuse_step(&mut self, cfg: &SlimeConfig, dt: f32) {
         // Diffusion and decay
-        for y in 0..self.front.medium.height() {
-            for x in 0..self.front.medium.width() {
-                let mut sum = 0.;
-                let mut n_parts = 0;
-                for i in -1..=1 {
-                    for j in -1..=1 {
-                        if let Some(v) =
-                            sample_array_isize(&self.front.medium, j + x as isize, i + y as isize)
-                        {
-                            sum += v;
-                            n_parts += 1;
+        self.back
+            .medium
+            .data_mut()
+            .par_chunks_exact_mut(self.front.medium.width())
+            .enumerate()
+            .for_each(|(y, row)| {
+                for (x, elem) in row.iter_mut().enumerate() {
+                    let mut sum = 0.;
+                    let mut n_parts = 0;
+                    for i in -1..=1 {
+                        for j in -1..=1 {
+                            if let Some(v) = sample_array_isize(
+                                &self.front.medium,
+                                j + x as isize,
+                                i + y as isize,
+                            ) {
+                                sum += v;
+                                n_parts += 1;
+                            }
                         }
                     }
+
+                    let avg = sum / n_parts as f32;
+
+                    let pos = (x, y);
+                    let center = self.front.medium[pos];
+
+                    let diffuse = mix(center, avg, cfg.diffusion * dt);
+
+                    let decayed = (1. - cfg.decay * dt) * diffuse;
+
+                    *elem = decayed;
                 }
-
-                let avg = sum / n_parts as f32;
-
-                let pos = (x, y);
-                let center = self.front.medium[pos];
-
-                let diffuse = mix(center, avg, cfg.diffusion * dt);
-
-                let decayed = (1. - cfg.decay * dt) * diffuse;
-
-                self.back.medium[pos] = decayed;
-            }
-        }
+            });
     }
 
     fn particle_step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
@@ -304,8 +312,6 @@ impl SlimeFactory {
     }
 }
 
-
 fn mix(a: f32, b: f32, t: f32) -> f32 {
     (1. - t) * a + t * b
 }
-
