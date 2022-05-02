@@ -10,3 +10,4 @@ edition = "2021"
 idek_basics = { git = "http://github.com/Masterchef365/idek-basics.git", rev = "6a3e9c74" }
 rand = "0.8"
 structopt = { version = "0.3", default-features = false }
+rayon = "1.5"

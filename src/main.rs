@@ -210,18 +210,19 @@ impl SlimeSim {
             // Sample the grid
             let [left, center, right] = [left_sensor_rot, unit_rot, right_sensor_rot]
                 .map(|r| f.position + r * f.heading * cfg.sample_dist)
-                .map(|p| sample_array_vect(&self.back.medium, p));
+                .map(|p| sample_array_vect(&self.back.medium, p))
+                .map(|p| p.map(|p| self.front.medium[p]));
 
             // Decide which way to go
-            let lc = left.cmp(&center);
-            let cr = center.cmp(&right);
+            let lc = left.partial_cmp(&center);
+            let cr = center.partial_cmp(&right);
 
             use std::cmp::Ordering as Odr;
 
             let rotation = match (lc, cr) {
-                (Odr::Greater, Odr::Greater) => left_turn_rate,
-                (Odr::Less, Odr::Less) => right_turn_rate,
-                (Odr::Less, Odr::Greater) => unit_rot,
+                (Some(Odr::Greater), Some(Odr::Greater)) => left_turn_rate,
+                (Some(Odr::Less), Some(Odr::Less)) => right_turn_rate,
+                (Some(Odr::Less), Some(Odr::Greater)) => unit_rot,
                 /*(Odr::Greater, Odr::Less) =>
                 *[left_turn_rate, unit_rot, right_turn_rate]
                 .choose(&mut rng)
@@ -290,8 +291,8 @@ impl SlimeFactory {
 
     pub fn slime(&self, mut rng: impl Rng) -> SlimeParticle {
         SlimeParticle {
-            //position: Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
-            position: Vector2::new(200., 200.), //Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
+            position: Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
+            //position: Vector2::new(200., 200.), //Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
             heading: unit_circ(self.angle.sample(&mut rng)),
         }
     }
