@@ -169,7 +169,7 @@ impl SlimeSim {
             .data_mut()
             .iter_mut()
             .zip(self.front.medium.data())
-            .for_each(|(b, f)| *b = f * (1. - cfg.decay * dt));
+            .for_each(|(b, f)| *b = f * (1. - cfg.decay * dt * f.max(0.5)));
 
         // Some premature optimization
         let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * dt);
@@ -196,8 +196,12 @@ impl SlimeSim {
             let rotation = match (lc, cr) {
                 (Odr::Greater, Odr::Greater) => left_turn_rate,
                 (Odr::Less, Odr::Less) => right_turn_rate,
-                (Odr::Greater, Odr::Less) => unit_rot,
-                _ => *[left_turn_rate, right_turn_rate].choose(&mut rng).unwrap(),
+                (Odr::Less, Odr::Greater) => unit_rot,
+                /*(Odr::Greater, Odr::Less) => 
+                    *[left_turn_rate, unit_rot, right_turn_rate]
+                    .choose(&mut rng)
+                    .unwrap(),*/
+                _ => unit_rot,
             };
 
             // Integrate rotation
@@ -250,7 +254,8 @@ impl SlimeFactory {
 
     pub fn slime(&self, mut rng: impl Rng) -> SlimeParticle {
         SlimeParticle {
-            position: Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
+            //position: Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
+            position: Vector2::new(200., 200.), //Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
             heading: unit_circ(self.angle.sample(&mut rng)),
         }
     }
