@@ -45,7 +45,7 @@ struct SlimeConfig {
     sensor_spread: f32,
 
     /// Turn rate, radians/time
-    #[structopt(short = "t", long, default_value = "0.26")]
+    #[structopt(short = "r", long, default_value = "0.26")]
     turn_speed: f32,
 
     /// Trail/slime decay rate
@@ -53,7 +53,7 @@ struct SlimeConfig {
     decay: f32,
 
     /// Deposit rate for slime
-    #[structopt(short = "r", long, default_value = "0.1")]
+    #[structopt(short = "e", long, default_value = "0.1")]
     deposit_rate: f32,
 
     /// Slime movement speed
@@ -222,7 +222,7 @@ impl SlimeSim {
 
 fn sample_array<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
     let bounds = |x: f32, w: usize| {
-        (x.is_finite() && x >= 0. && x <= w as f32) //
+        (x.is_finite() && x >= 0. && x < w as f32) //
             .then(|| x as usize)
     };
 
