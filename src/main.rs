@@ -2,9 +2,10 @@ use idek::prelude::*;
 use idek_basics::{
     draw_array2d::draw_grid_fuzzy,
     idek::{
+        winit::{self, event::{WindowEvent, ElementState, VirtualKeyCode}},
         self,
         nalgebra::{Rotation2, Vector1, Vector2},
-        simple_ortho_cam_ctx,
+        simple_ortho_cam_ctx, close_when_asked,
     },
     Array2D, GraphicsBuilder,
 };
@@ -75,6 +76,7 @@ struct SlimeApp {
     args: SlimeArgs,
     sim: SlimeSim,
     gb: GraphicsBuilder,
+    play: bool,
 }
 
 impl App<SlimeArgs> for SlimeApp {
@@ -94,6 +96,7 @@ impl App<SlimeArgs> for SlimeApp {
         let indices = ctx.indices(&gb.indices, false)?;
 
         Ok(Self {
+            play: false,
             verts,
             indices,
             gb,
@@ -104,8 +107,10 @@ impl App<SlimeArgs> for SlimeApp {
 
     fn frame(&mut self, ctx: &mut Context, platform: &mut Platform) -> Result<Vec<DrawCmd>> {
         // Timing
-        self.sim
-            .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
+        if self.play {
+            self.sim
+                .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
+        }
 
         // Update view
         self.gb.clear();
@@ -116,6 +121,29 @@ impl App<SlimeArgs> for SlimeApp {
         simple_ortho_cam_ctx(ctx, platform);
 
         Ok(vec![DrawCmd::new(self.verts).indices(self.indices)])
+    }
+
+    fn event(&mut self, _ctx: &mut Context, platform: &mut Platform, event: Event) -> Result<()> {
+        use winit::event::Event as WinitEvent;
+        #[allow(irrefutable_let_patterns)]
+        if let Event::Winit(event) = event {
+            if let WinitEvent::WindowEvent { event, .. } = event {
+                if let WindowEvent::KeyboardInput { input, .. } = event {
+                    if input.state == ElementState::Released {
+                        if let Some(keycode) = input.virtual_keycode {
+                            match keycode {
+                                VirtualKeyCode::Space => self.play = !self.play,
+                                _ => (),
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        close_when_asked(platform, &event);
+
+        Ok(())
     }
 }
 
