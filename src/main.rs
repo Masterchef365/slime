@@ -9,7 +9,7 @@ use idek_basics::{
     Array2D, GraphicsBuilder,
 };
 use rand::{distributions::Uniform, prelude::*};
-use std::f32::consts::TAU;
+use std::{f32::consts::TAU, path::{Path, PathBuf}};
 use structopt::StructOpt;
 
 fn main() -> Result<()> {
@@ -22,14 +22,19 @@ struct SlimeArgs {
     #[structopt(short = "t", long, default_value = "0.1")]
     dt: f32,
 
+    /*
     #[structopt(short = "w", long, default_value = "400")]
     width: usize,
 
     #[structopt(short = "h", long, default_value = "400")]
     height: usize,
+    */
 
     #[structopt(short = "n", long, default_value = "2000")]
     n_particles: usize,
+
+    #[structopt(short = "b", long, default_value = "bias.png")]
+    bias: PathBuf,
 
     #[structopt(long)]
     vr: bool,
@@ -79,9 +84,10 @@ struct SlimeApp {
 
 impl App<SlimeArgs> for SlimeApp {
     fn init(ctx: &mut Context, _: &mut Platform, args: SlimeArgs) -> Result<Self> {
+        let bias = load_grayscale_png(&args.bias)?;
+
         let sim = SlimeSim::new(
-            args.width,
-            args.height,
+            bias,
             args.n_particles,
             &mut rand::thread_rng(),
         );
@@ -138,6 +144,8 @@ struct SlimeSim {
     back: SlimeData,
     /// Slime factory
     factory: SlimeFactory,
+    /// Bias factor. Sus
+    bias: Array2D<f32>,
 }
 
 fn unit_circ(a: f32) -> Vector2<f32> {
@@ -145,17 +153,18 @@ fn unit_circ(a: f32) -> Vector2<f32> {
 }
 
 impl SlimeSim {
-    pub fn new(width: usize, height: usize, n_particles: usize, mut rng: impl Rng) -> Self {
-        let factory = SlimeFactory::new(width, height);
+    pub fn new(bias: Array2D<f32>, n_particles: usize, mut rng: impl Rng) -> Self {
+        let factory = SlimeFactory::new(bias.width(), bias.height());
 
         let slime = (0..n_particles).map(|_| factory.slime(&mut rng)).collect();
 
         let front = SlimeData {
             slime,
-            medium: Array2D::new(width, height),
+            medium: Array2D::new(bias.width(), bias.height()),
         };
 
         Self {
+            bias,
             back: front.clone(),
             front,
             factory,
@@ -221,7 +230,7 @@ impl SlimeSim {
             let [left, center, right] = [left_sensor_rot, unit_rot, right_sensor_rot]
                 .map(|r| f.position + r * f.heading * cfg.sample_dist)
                 .map(|p| sample_array_vect(&self.back.medium, p))
-                .map(|p| p.map(|p| self.front.medium[p]));
+                .map(|p| p.map(|p| self.front.medium[p] + self.bias[p]));
 
             // Decide which way to go
             let lc = left.partial_cmp(&center);
@@ -311,3 +320,15 @@ fn mix(a: f32, b: f32, t: f32) -> f32 {
     (1. - t) * a + t * b
 }
 
+fn load_grayscale_png(path: impl AsRef<Path>) -> Result<Array2D<f32>> {
+    use std::fs::File;
+    let decoder = png::Decoder::new(File::open(path)?);
+    let mut reader = decoder.read_info()?;
+    let mut buf = vec![0; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).unwrap();
+    let bytes = &buf[..info.buffer_size()];
+
+    let data = bytes.iter().map(|&b| b as f32 / 256.).collect();
+
+    Ok(Array2D::from_array(info.width as _, data))
+}

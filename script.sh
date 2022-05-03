@@ -1,5 +1,4 @@
 cargo run --release --\
-    -w 400 -h 400\
     --decay 0.2\
     --n-particles 10000\
     --turn-speed 1.8\
@@ -8,4 +7,5 @@ cargo run --release --\
     --sensor-spread 0.8\
     --sample-dist 3.0\
     --deposit-rate 1.0\
-    --diffusion 0.1
+    --diffusion 0.1\
+    --bias sus.png
