@@ -198,7 +198,9 @@ impl SlimeSim {
 
                 let decayed = (1. - cfg.decay * dt) * diffuse;
 
-                self.back.medium[pos] = decayed;
+                let thresholded = decayed.max(0.);
+
+                self.back.medium[pos] = thresholded;
             }
         }
     }

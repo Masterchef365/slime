@@ -494,6 +494,7 @@ dependencies = [
 [[package]]
 name = "idek_basics"
 version = "0.1.0"
+source = "git+http://github.com/Masterchef365/idek-basics.git?rev=80e91fe91b5#80e91fe91b5815b33bbdab1703dd44be2c1b84d7"
 dependencies = [
  "idek",
 ]

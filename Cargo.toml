@@ -11,6 +11,7 @@ idek_basics = { git = "http://github.com/Masterchef365/idek-basics.git", rev = "
 rand = "0.8"
 structopt = { version = "0.3", default-features = false }
 rayon = "1.5"
+png = "0.17"
 
 [profile.release]
 debug = true
