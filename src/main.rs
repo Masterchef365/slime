@@ -138,7 +138,8 @@ impl App<SlimeArgs> for SlimeApp {
                     if input.state == ElementState::Released {
                         if let Some(keycode) = input.virtual_keycode {
                             match keycode {
-                                VirtualKeyCode::Space => self.play = !self.play,
+                                VirtualKeyCode::Y => self.play = !self.play,
+                                VirtualKeyCode::R => self.sim.reset(&mut rand::thread_rng()),
                                 _ => (),
                             }
                         }
@@ -197,6 +198,10 @@ impl SlimeSim {
             front,
             factory,
         }
+    }
+
+    pub fn reset(&mut self, rng: impl Rng) {
+        *self = Self::new(self.bias.clone(), self.front.slime.len(), rng);
     }
 
     pub fn frame(&self) -> &SlimeData {
