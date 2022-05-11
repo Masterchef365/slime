@@ -96,7 +96,7 @@ fn main() -> Result<()> {
                 let color = if angle > 2. * TAU / 3. {
                     [0xff, 0xcf, 0x00]
                 } else if angle > TAU / 3. {
-                    [0x00, 0xa, 0xff]
+                    [0x00, 0xa9, 0xff]
                 } else {
                     [0xff, 0x00, 0x88]
                 };
