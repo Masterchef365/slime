@@ -11,3 +11,6 @@ idek_basics = { git = "http://github.com/Masterchef365/idek-basics.git", rev = "
 rand = "0.8"
 structopt = { version = "0.3", default-features = false }
 rayon = "1.5"
+serde = { version = "1", features = ["derive"] }
+bincode = "1.3.3"
+nalgebra = { version = "0.26", features = ["serde-serialize"] }

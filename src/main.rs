@@ -1,11 +1,16 @@
 use idek::prelude::*;
+use idek::winit;
 use idek_basics::{
     draw_array2d::draw_grid,
     idek::{self, simple_ortho_cam_ctx},
     GraphicsBuilder,
 };
+use std::path::PathBuf;
 
-use slime::*;
+use slime::{
+    record::{record_frame, RecordFile},
+    sim::*,
+};
 use structopt::StructOpt;
 
 fn main() -> Result<()> {
@@ -30,6 +35,9 @@ struct SlimeArgs {
     #[structopt(long)]
     vr: bool,
 
+    #[structopt(long)]
+    record: Option<PathBuf>,
+
     #[structopt(long, default_value = "1")]
     steps_per_frame: usize,
 
@@ -43,6 +51,7 @@ struct SlimeApp {
     args: SlimeArgs,
     sim: SlimeSim,
     gb: GraphicsBuilder,
+    record: RecordFile,
 }
 
 impl App<SlimeArgs> for SlimeApp {
@@ -62,6 +71,7 @@ impl App<SlimeArgs> for SlimeApp {
         let indices = ctx.indices(&gb.indices, false)?;
 
         Ok(Self {
+            record: RecordFile::new(),
             verts,
             indices,
             gb,
@@ -73,6 +83,7 @@ impl App<SlimeArgs> for SlimeApp {
     fn frame(&mut self, ctx: &mut Context, platform: &mut Platform) -> Result<Vec<DrawCmd>> {
         // Timing
         for _ in 0..self.args.steps_per_frame {
+            record_frame(&mut self.record, &mut self.sim);
             self.sim
                 .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
         }
@@ -86,6 +97,32 @@ impl App<SlimeArgs> for SlimeApp {
         simple_ortho_cam_ctx(ctx, platform);
 
         Ok(vec![DrawCmd::new(self.verts).indices(self.indices)])
+    }
+
+    /// Called once per event
+    fn event(&mut self, _ctx: &mut Context, platform: &mut Platform, event: Event) -> Result<()> {
+        match (event, platform) {
+            (
+                Event::Winit(winit::event::Event::WindowEvent {
+                    event: winit::event::WindowEvent::CloseRequested,
+                    ..
+                }),
+                Platform::Winit { control_flow, .. },
+            ) => {
+                **control_flow = winit::event_loop::ControlFlow::Exit;
+                self.exit();
+            }
+            _ => (),
+        }
+        Ok(())
+    }
+}
+
+impl SlimeApp {
+    fn exit(&self) {
+        if let Some(path) = self.args.record.as_ref() {
+            self.record.save(&path).expect("Failed to save");
+        }
     }
 }
 
