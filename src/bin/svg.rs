@@ -16,6 +16,12 @@ struct Opt {
 
     #[structopt(short, long)]
     last_frame: Option<usize>,
+
+    #[structopt(short, long, default_value = "1")]
+    frame_step: usize,
+
+    #[structopt(short, long, default_value = "0.01")]
+    stroke_width: f32,
 }
 use svg::node::element::path::Data;
 use svg::node::element::Path;
@@ -43,7 +49,7 @@ fn main() -> Result<()> {
         Path::new()
             .set("fill", "none")
             .set("stroke", "black")
-            .set("stroke-width", 0.1)
+            .set("stroke-width", args.stroke_width)
             .set("d", data)
     };
 
@@ -61,14 +67,17 @@ fn main() -> Result<()> {
                     document = document.add(finish_path(finished));
                 }
             } else {
-                let line = path
-                    .take()
-                    .map(|path| path.line_to((part.position.x, part.position.y)));
-                *path = line;
+                if idx % args.frame_step == 0 {
+                    let line = path
+                        .take()
+                        .map(|path| path.line_to((part.position.x, part.position.y)));
+                    *path = line;
+                }
             }
         }
     }
 
+    println!("Finishing paths...");
     for path in paths {
         if let Some(path) = path {
             document = document.add(finish_path(path));
