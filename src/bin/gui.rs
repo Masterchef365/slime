@@ -62,6 +62,8 @@ impl App<SlimeArgs> for SlimeApp {
             &mut rand::thread_rng(),
         );
 
+        let record = RecordFile::new(args.width, args.height);
+
         let mut gb = GraphicsBuilder::new();
 
         draw_sim(&mut gb, &sim);
@@ -70,7 +72,7 @@ impl App<SlimeArgs> for SlimeApp {
         let indices = ctx.indices(&gb.indices, false)?;
 
         Ok(Self {
-            record: RecordFile::new(),
+            record,
             verts,
             indices,
             gb,

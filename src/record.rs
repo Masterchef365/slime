@@ -10,6 +10,8 @@ pub fn record_frame(record: &mut RecordFile, sim: &SlimeSim) {
 
 #[derive(Default, Serialize, Deserialize)]
 pub struct RecordFile {
+    pub width: usize,
+    pub height: usize,
     pub frames: Vec<RecordFrame>,
 }
 
@@ -19,8 +21,12 @@ pub struct RecordFrame {
 }
 
 impl RecordFile {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(width: usize, height: usize) -> Self {
+        Self {
+            width,
+            height,
+            frames: vec![],
+        }
     }
 
     pub fn load(path: &Path) -> Result<Self> {
