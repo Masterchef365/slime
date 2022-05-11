@@ -1,17 +1,12 @@
 use idek::prelude::*;
 use idek_basics::{
     draw_array2d::draw_grid,
-    idek::{
-        self,
-        nalgebra::{Rotation2, Vector1, Vector2},
-        simple_ortho_cam_ctx,
-    },
-    Array2D, GraphicsBuilder,
+    idek::{self, simple_ortho_cam_ctx},
+    GraphicsBuilder,
 };
-use rand::{distributions::Uniform, prelude::*};
-use std::f32::consts::TAU;
-use structopt::StructOpt;
+
 use slime::*;
+use structopt::StructOpt;
 
 fn main() -> Result<()> {
     let args = SlimeArgs::from_args();
@@ -41,6 +36,7 @@ struct SlimeArgs {
     #[structopt(flatten)]
     cfg: SlimeConfig,
 }
+
 struct SlimeApp {
     verts: VertexBuffer,
     indices: IndexBuffer,

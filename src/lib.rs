@@ -1,13 +1,5 @@
-use idek::prelude::*;
-use idek_basics::{
-    draw_array2d::draw_grid,
-    idek::{
-        self,
-        nalgebra::{Rotation2, Vector1, Vector2},
-        simple_ortho_cam_ctx,
-    },
-    Array2D, GraphicsBuilder,
-};
+use idek_basics::{idek::nalgebra, Array2D};
+use nalgebra::{Rotation2, Vector1, Vector2};
 use rand::{distributions::Uniform, prelude::*};
 use std::f32::consts::TAU;
 use structopt::StructOpt;
@@ -167,7 +159,11 @@ impl SlimeSim {
             // Drop some slime (or create a new particle if out of bounds)
             if let Some(pos) = sample_array_vect(&self.back.medium, position) {
                 self.back.medium[pos] += cfg.deposit_rate * dt;
-                *b = SlimeParticle { position, heading, age };
+                *b = SlimeParticle {
+                    position,
+                    heading,
+                    age,
+                };
             } else {
                 *b = self.factory.slime(&mut rng);
             }
@@ -222,10 +218,6 @@ impl SlimeFactory {
     }
 }
 
-
 fn mix(a: f32, b: f32, t: f32) -> f32 {
     (1. - t) * a + t * b
 }
-
-
-
