@@ -6,7 +6,6 @@ use idek_basics::{
     GraphicsBuilder,
 };
 use std::path::PathBuf;
-
 use slime::{
     record::{record_frame, RecordFile},
     sim::*,
