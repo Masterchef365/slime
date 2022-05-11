@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use idek_basics::Array2D;
 use nalgebra::Vector2;
-use slime::xiaolin;
 use slime::{record::RecordFile, xiaolin::draw_line};
 use std::f32::consts::{PI, TAU};
 use std::{
@@ -30,9 +29,6 @@ struct Opt {
     #[structopt(short, long, default_value = "1")]
     frame_step: usize,
 
-    #[structopt(short, long, default_value = "0.01")]
-    stroke_width: f32,
-
     #[structopt(short, long, default_value = "1000")]
     width: usize,
 
@@ -40,7 +36,7 @@ struct Opt {
     height: usize,
 
     /// Intensity of plotted points
-    #[structopt(short, long, default_value = "0.01")]
+    #[structopt(short, long, default_value = "0.05")]
     intensity: f32,
 }
 
@@ -97,10 +93,10 @@ fn main() -> Result<()> {
                 let y_center_off: f32 = part.origin.y - rec_center_y;
                 let angle = y_center_off.atan2(x_center_off) + PI;
 
-                let color = if angle > 2. * TAU / 3. { 
+                let color = if angle > 2. * TAU / 3. {
                     [0xff, 0xcf, 0x00]
-                } else if angle > TAU / 3. { 
-                    [0x00, 0xa, 0x9ff]
+                } else if angle > TAU / 3. {
+                    [0x00, 0xa, 0xff]
                 } else {
                     [0xff, 0x00, 0x88]
                 };
