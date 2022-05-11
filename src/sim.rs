@@ -40,6 +40,7 @@ pub struct SlimeConfig {
 pub struct SlimeParticle {
     pub position: Vector2<f32>,
     pub heading: Vector2<f32>,
+    pub origin: Vector2<f32>,
     pub age: u32,
 }
 
@@ -161,6 +162,7 @@ impl SlimeSim {
             if let Some(pos) = sample_array_vect(&self.back.medium, position) {
                 self.back.medium[pos] += cfg.deposit_rate * dt;
                 *b = SlimeParticle {
+                    origin: f.origin,
                     position,
                     heading,
                     age,
@@ -210,8 +212,10 @@ impl SlimeFactory {
     }
 
     pub fn slime(&self, mut rng: impl Rng) -> SlimeParticle {
+        let origin = Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng));
         SlimeParticle {
-            position: Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
+            position: origin,
+            origin,
             //position: Vector2::new(200., 200.), //Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
             heading: unit_circ(self.angle.sample(&mut rng)),
             age: 0,

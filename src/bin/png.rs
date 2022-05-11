@@ -3,6 +3,7 @@ use idek_basics::Array2D;
 use nalgebra::Vector2;
 use slime::xiaolin;
 use slime::{record::RecordFile, xiaolin::draw_line};
+use std::f32::consts::{PI, TAU};
 use std::{
     fs::File,
     io::BufWriter,
@@ -77,6 +78,9 @@ fn main() -> Result<()> {
         }
     };
 
+    let rec_center_x = record.width as f32 / 2.;
+    let rec_center_y = record.height as f32 / 2.;
+
     println!("Building SVG...");
     for (idx, frame) in frames.into_iter().enumerate() {
         if idx % 100 == 0 {
@@ -89,9 +93,25 @@ fn main() -> Result<()> {
 
         for (part, prev) in frame.slime.iter().zip(&last.slime) {
             if part.age != 0 {
+                let x_center_off: f32 = part.origin.x - rec_center_x;
+                let y_center_off: f32 = part.origin.y - rec_center_y;
+                let angle = y_center_off.atan2(x_center_off) + PI;
+
+                let color = if angle > 2. * TAU / 3. { 
+                    [0xff, 0xcf, 0x00]
+                } else if angle > TAU / 3. { 
+                    [0x00, 0xa, 0x9ff]
+                } else {
+                    [0xff, 0x00, 0x88]
+                };
+
+                let color = color.map(|v| v as f32 / 256.);
+
+                let color = |b: f32| color.map(|v| v * b);
+
                 let (x0, y0) = coord_map(prev.position);
                 let (x1, y1) = coord_map(part.position);
-                draw_line(x0, y0, x1, y1, |x, y, b| plot_point(x, y, [b; 3]));
+                draw_line(x0, y0, x1, y1, |x, y, b| plot_point(x, y, color(b)));
             }
         }
 
