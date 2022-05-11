@@ -19,7 +19,7 @@ fn main() -> Result<()> {
 
 #[derive(Clone, Default, Debug, StructOpt)]
 struct SlimeArgs {
-    #[structopt(short = "t", long, default_value = "0.1")]
+    #[structopt(short = "t", long, default_value = "0.5")]
     dt: f32,
 
     #[structopt(short = "w", long, default_value = "400")]
@@ -28,11 +28,14 @@ struct SlimeArgs {
     #[structopt(short = "h", long, default_value = "400")]
     height: usize,
 
-    #[structopt(short = "n", long, default_value = "2000")]
+    #[structopt(short = "n", long, default_value = "4000")]
     n_particles: usize,
 
     #[structopt(long)]
     vr: bool,
+
+    #[structopt(long, default_value = "1")]
+    steps_per_frame: usize,
 
     #[structopt(flatten)]
     cfg: SlimeConfig,
@@ -41,31 +44,31 @@ struct SlimeArgs {
 #[derive(Clone, Default, Debug, StructOpt)]
 struct SlimeConfig {
     /// Angle between adjacent sensors (radians)
-    #[structopt(short = "s", long, default_value = "0.26")]
+    #[structopt(short = "s", long, default_value = "0.8")]
     sensor_spread: f32,
 
     /// Turn rate, radians/time
-    #[structopt(short = "r", long, default_value = "0.26")]
+    #[structopt(short = "r", long, default_value = "1.8")]
     turn_speed: f32,
 
     /// Trail/slime decay rate
-    #[structopt(short = "d", long, default_value = "0.01")]
+    #[structopt(short = "d", long, default_value = "0.05")]
     decay: f32,
 
     /// Deposit rate for slime
-    #[structopt(short = "e", long, default_value = "0.1")]
+    #[structopt(short = "e", long, default_value = "1.0")]
     deposit_rate: f32,
 
     /// Slime movement speed
-    #[structopt(short = "m", long, default_value = "1.")]
+    #[structopt(short = "m", long, default_value = "1.0")]
     move_speed: f32,
 
     /// Sample distance
-    #[structopt(short = "u", long, default_value = "1.")]
+    #[structopt(short = "u", long, default_value = "3.0")]
     sample_dist: f32,
 
     /// Diffusion rate of the medium
-    #[structopt(short = "i", long, default_value = "1.")]
+    #[structopt(short = "i", long, default_value = "0.1")]
     diffusion: f32,
 }
 
@@ -104,8 +107,10 @@ impl App<SlimeArgs> for SlimeApp {
 
     fn frame(&mut self, ctx: &mut Context, platform: &mut Platform) -> Result<Vec<DrawCmd>> {
         // Timing
-        self.sim
-            .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
+        for _ in 0..self.args.steps_per_frame {
+            self.sim
+                .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
+        }
 
         // Update view
         self.gb.clear();
@@ -123,6 +128,7 @@ impl App<SlimeArgs> for SlimeApp {
 struct SlimeParticle {
     pub position: Vector2<f32>,
     pub heading: Vector2<f32>,
+    pub age: u32,
 }
 
 #[derive(Clone)]
@@ -236,11 +242,13 @@ impl SlimeSim {
             // Integrate position
             let position = f.position + heading * cfg.move_speed * dt;
 
+            // Happy birthday!
+            let age = f.age + 1;
+
             // Drop some slime (or create a new particle if out of bounds)
             if let Some(pos) = sample_array_vect(&self.back.medium, position) {
                 self.back.medium[pos] += cfg.deposit_rate * dt;
-
-                *b = SlimeParticle { position, heading };
+                *b = SlimeParticle { position, heading, age };
             } else {
                 *b = self.factory.slime(&mut rng);
             }
@@ -294,6 +302,7 @@ impl SlimeFactory {
             position: Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
             //position: Vector2::new(200., 200.), //Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
             heading: unit_circ(self.angle.sample(&mut rng)),
+            age: 0,
         }
     }
 }

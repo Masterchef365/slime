@@ -7,4 +7,5 @@ cargo run --release --\
     --sensor-spread 0.8\
     --sample-dist 3.0\
     --deposit-rate 1.0\
-    --diffusion 0.1
+    --diffusion 0.1\
+    --steps-per-frame 1
