@@ -48,12 +48,15 @@ struct SlimeArgs {
 }
 
 struct SlimeApp {
-    verts: VertexBuffer,
-    indices: IndexBuffer,
     args: SlimeArgs,
     sim: SlimeSim,
-    gb: GraphicsBuilder,
     record: RecordFile,
+
+    gb: GraphicsBuilder,
+    verts: VertexBuffer,
+    indices: IndexBuffer,
+    shader: Shader,
+
     camera: MultiPlatformCamera,
 }
 
@@ -75,9 +78,15 @@ impl App<SlimeArgs> for SlimeApp {
 
         let verts = ctx.vertices(&gb.vertices, true)?;
         let indices = ctx.indices(&gb.indices, false)?;
+        let shader = ctx.shader(
+            DEFAULT_VERTEX_SHADER,
+            DEFAULT_FRAGMENT_SHADER,
+            Primitive::Points,
+        )?;
 
         Ok(Self {
             camera: MultiPlatformCamera::new(platform),
+            shader,
             record,
             verts,
             indices,
@@ -100,11 +109,18 @@ impl App<SlimeArgs> for SlimeApp {
         draw_sim(&mut self.gb, &self.sim);
         ctx.update_vertices(self.verts, &self.gb.vertices)?;
 
-        Ok(vec![DrawCmd::new(self.verts).indices(self.indices)])
+        Ok(vec![DrawCmd::new(self.verts)
+            .indices(self.indices)
+            .shader(self.shader)])
     }
 
     /// Called once per event
-    fn event(&mut self, ctx: &mut Context, platform: &mut Platform, mut event: Event) -> Result<()> {
+    fn event(
+        &mut self,
+        ctx: &mut Context,
+        platform: &mut Platform,
+        mut event: Event,
+    ) -> Result<()> {
         if self.camera.handle_event(&mut event) {
             ctx.set_camera_prefix(self.camera.get_prefix())
         }
@@ -135,21 +151,41 @@ impl SlimeApp {
 }
 
 fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
-    let base = gb.push_vertex(Vertex::new([-1.0, -1.0, -1.0], [0.0, 1.0, 1.0]));
-    gb.push_vertex(Vertex::new([1.0, -1.0, -1.0], [1.0, 0.0, 1.0]));
-    gb.push_vertex(Vertex::new([1.0, 1.0, -1.0], [1.0, 1.0, 0.0]));
-    gb.push_vertex(Vertex::new([-1.0, 1.0, -1.0], [0.0, 1.0, 1.0]));
-    gb.push_vertex(Vertex::new([-1.0, -1.0, 1.0], [1.0, 0.0, 1.0]));
-    gb.push_vertex(Vertex::new([1.0, -1.0, 1.0], [1.0, 1.0, 0.0]));
-    gb.push_vertex(Vertex::new([1.0, 1.0, 1.0], [0.0, 1.0, 1.0]));
-    gb.push_vertex(Vertex::new([-1.0, 1.0, 1.0], [1.0, 0.0, 1.0]));
+    let scale = 5.;
+    let color = [1.; 3];
 
-    let indices = [
-        3, 1, 0, 2, 1, 3, 2, 5, 1, 6, 5, 2, 6, 4, 5, 7, 4, 6, 7, 0, 4, 3, 0, 7, 7, 2, 3, 6, 2, 7,
-        0, 5, 4, 1, 5, 0,
-    ];
+    let frame = sim.frame();
+    let medium = &frame.medium;
 
-    gb.push_indices(&indices.map(|i| i + base));
+    let n_width_verts = medium.width() + 1;
+    let n_height_verts = medium.height() + 1;
+    let n_depth_verts = medium.length() + 1;
+
+    let map = |v| (v * 2. - 1.) * scale;
+
+    let base = gb.indices.len() as u32;
+
+    for k in 0..n_depth_verts {
+        let z = map(k as f32 / n_depth_verts as f32);
+        for j in 0..n_height_verts {
+            let y = map(j as f32 / n_height_verts as f32);
+            for i in 0..n_width_verts {
+                let x = map(i as f32 / n_width_verts as f32);
+
+                if i < medium.width() && j < medium.height() && k < medium.length() {
+                    let v = medium[(i, j, k)];
+
+                    let color = [v * 2.; 3];
+
+                    let idx = gb.push_vertex(Vertex::new([x, y, z], color));
+                    gb.push_indices(&[idx]);
+                }
+
+            }
+        }
+    }
+
+    //gb.push_indices(&indices.map(|i| i + base));
 
     //draw_grid(gb, &sim.frame().medium, |&v| [v; 3], 0.);
 }
