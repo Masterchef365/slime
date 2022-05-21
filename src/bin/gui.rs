@@ -79,8 +79,10 @@ impl App<SlimeArgs> for SlimeApp {
         let verts = ctx.vertices(&gb.vertices, true)?;
         let indices = ctx.indices(&gb.indices, false)?;
         let shader = ctx.shader(
-            DEFAULT_VERTEX_SHADER,
-            DEFAULT_FRAGMENT_SHADER,
+            include_bytes!("shaders/unlit.vert.spv"),
+            include_bytes!("shaders/unlit.frag.spv"),
+            //DEFAULT_VERTEX_SHADER,
+            //DEFAULT_FRAGMENT_SHADER,
             Primitive::Points,
         )?;
 
@@ -175,7 +177,8 @@ fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
                 if i < medium.width() && j < medium.height() && k < medium.length() {
                     let v = medium[(i, j, k)];
 
-                    let color = [v * 2.; 3];
+                    let v = v * 4.;
+                    let color = [v * 0.1, v * 0.5, v];
 
                     let idx = gb.push_vertex(Vertex::new([x, y, z], color));
                     gb.push_indices(&[idx]);
