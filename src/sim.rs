@@ -1,8 +1,8 @@
 use idek_basics::Array3D;
-use nalgebra::{Rotation2, Vector1, Vector2, Vector3};
+use nalgebra::{Rotation2, Rotation3, Unit, UnitQuaternion, Vector1, Vector2, Vector3};
 use rand::{distributions::Uniform, prelude::*};
 use serde::{Deserialize, Serialize};
-use std::f32::consts::TAU;
+use std::f32::consts::{PI, TAU};
 use structopt::StructOpt;
 
 type Pos = (isize, isize, isize);
@@ -45,7 +45,7 @@ pub struct SlimeConfig {
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct SlimeParticle {
     pub position: Vector3<f32>,
-    pub heading: Vector2<f32>,
+    pub heading: UnitQuaternion<f32>,
     pub origin: Vector3<f32>,
     pub age: u32,
 }
@@ -98,10 +98,17 @@ impl SlimeSim {
     }
 
     pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
-        // Diffusion and decay
+        self.step_medium(cfg, dt, &mut rng);
+        self.step_particles(cfg, dt, &mut rng);
+        std::mem::swap(&mut self.front, &mut self.back);
+    }
+
+    /// Diffusion and decay
+    fn step_medium(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
         for z in 0..self.front.medium.length() {
             for y in 0..self.front.medium.height() {
                 for x in 0..self.front.medium.width() {
+                    // TODO: break this out into a function. Don't nest so deep!
                     let mut sum = 0.;
                     let mut n_parts = 0;
                     for i in -1..=1 {
@@ -130,46 +137,58 @@ impl SlimeSim {
                 }
             }
         }
+    }
 
-        // Some premature optimization
-        let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * dt);
-        let right_sensor_rot = left_sensor_rot.inverse();
+    fn step_particles(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
+        let particle_tip = Vector3::z();
 
-        let left_turn_rate = Rotation2::from_scaled_axis(Vector1::new(cfg.turn_speed) * dt);
-        let right_turn_rate = left_turn_rate.inverse();
+        let particle_yaw_axis = Unit::new_unchecked(Vector3::x());
+        let particle_pitch_axis = Unit::new_unchecked(Vector3::y());
 
-        let unit_rot = Rotation2::identity();
+        let yaw_sensor = UnitQuaternion::from_axis_angle(&particle_yaw_axis, cfg.sensor_spread);
+        let pitch_sensor = UnitQuaternion::from_axis_angle(&particle_pitch_axis, cfg.sensor_spread);
+
+        let yaw_turn = UnitQuaternion::from_axis_angle(&particle_yaw_axis, cfg.turn_speed * dt);
+        let pitch_turn = UnitQuaternion::from_axis_angle(&particle_pitch_axis, cfg.turn_speed * dt);
+
+        let unit_rot = UnitQuaternion::identity();
 
         // Step particle motion
         for (b, f) in self.back.slime.iter_mut().zip(&self.front.slime) {
-            // Sample the grid
-            let [left, center, right] = [left_sensor_rot, unit_rot, right_sensor_rot]
-                .map(|r| f.position + (r * f.heading * cfg.sample_dist).push(0.))
-                .map(|p| sample_array_vect(&self.back.medium, p))
-                .map(|p| p.map(|p| self.front.medium[p]));
-
-            // Decide which way to go
-            let lc = left.partial_cmp(&center);
-            let cr = center.partial_cmp(&right);
-
-            use std::cmp::Ordering as Odr;
-
-            let rotation = match (lc, cr) {
-                (Some(Odr::Greater), Some(Odr::Greater)) => left_turn_rate,
-                (Some(Odr::Less), Some(Odr::Less)) => right_turn_rate,
-                (Some(Odr::Less), Some(Odr::Greater)) => unit_rot,
-                /*(Odr::Greater, Odr::Less) =>
-                *[left_turn_rate, unit_rot, right_turn_rate]
-                .choose(&mut rng)
-                .unwrap(),*/
-                _ => unit_rot,
+            // Sample a particle's sensor
+            let sample = |part: &SlimeParticle, rot: UnitQuaternion<f32>| {
+                let sensor_offset = rot * part.heading * particle_tip * cfg.sample_dist;
+                sample_array_vect(&self.back.medium, part.position + sensor_offset)
+                    .map(|p| self.front.medium[p])
             };
+
+            // Sample using a rotation
+            let rotsample = |sensor: UnitQuaternion<f32>, turn: UnitQuaternion<f32>| {
+                // Sample the grid
+                let [left, center, right] =
+                    [sensor, unit_rot, sensor.inverse()].map(|r| sample(f, r));
+
+                // Decide which way to go
+                let lc = left.partial_cmp(&center);
+                let cr = center.partial_cmp(&right);
+
+                use std::cmp::Ordering as Odr;
+
+                match (lc, cr) {
+                    (Some(Odr::Greater), Some(Odr::Greater)) => turn,
+                    (Some(Odr::Less), Some(Odr::Less)) => turn.inverse(),
+                    _ => unit_rot,
+                }
+            };
+
+            // Total descision
+            let rotation = rotsample(yaw_sensor, yaw_turn) * rotsample(pitch_sensor, pitch_turn);
 
             // Integrate rotation
             let heading = rotation * f.heading;
 
             // Integrate position
-            let position = f.position + (heading * cfg.move_speed * dt).push(cfg.dive_rate * dt);
+            let position = f.position + (heading * particle_tip * cfg.move_speed * dt);
 
             // Happy birthday!
             let age = f.age + 1;
@@ -187,8 +206,6 @@ impl SlimeSim {
                 *b = self.factory.slime(&mut rng);
             }
         }
-
-        std::mem::swap(&mut self.front, &mut self.back);
     }
 }
 
@@ -225,7 +242,8 @@ struct SlimeFactory {
     x: Uniform<f32>,
     y: Uniform<f32>,
     z: Uniform<f32>,
-    angle: Uniform<f32>,
+    theta: Uniform<f32>,
+    rho: Uniform<f32>,
 }
 
 impl SlimeFactory {
@@ -233,8 +251,17 @@ impl SlimeFactory {
         let x = Uniform::new(0.0, width as f32);
         let y = Uniform::new(0.0, height as f32);
         let z = Uniform::new(0.0, length as f32);
-        let angle = Uniform::new(0., TAU);
-        Self { x, y, z, angle }
+
+        let theta = Uniform::new(0., PI);
+        let rho = Uniform::new(-PI, PI);
+
+        Self {
+            x,
+            y,
+            z,
+            theta,
+            rho,
+        }
     }
 
     pub fn slime(&self, mut rng: impl Rng) -> SlimeParticle {
@@ -243,11 +270,19 @@ impl SlimeFactory {
             self.y.sample(&mut rng),
             self.z.sample(&mut rng),
         );
+
+        // Depends on PARTICLE_TIP!
+        let heading = UnitQuaternion::from_euler_angles(
+            self.theta.sample(&mut rng),
+            self.rho.sample(&mut rng),
+            0.,
+        );
+
         SlimeParticle {
             position: origin,
             origin,
+            heading,
             //position: Vector2::new(200., 200.), //Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng)),
-            heading: unit_circ(self.angle.sample(&mut rng)),
             age: 0,
         }
     }
