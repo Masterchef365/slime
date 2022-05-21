@@ -22,13 +22,13 @@ struct SlimeArgs {
     #[structopt(short = "t", long, default_value = "0.5")]
     dt: f32,
 
-    #[structopt(short = "w", long, default_value = "400")]
+    #[structopt(short = "w", long, default_value = "60")]
     width: usize,
 
-    #[structopt(short = "h", long, default_value = "400")]
+    #[structopt(short = "h", long, default_value = "60")]
     height: usize,
 
-    #[structopt(short = "h", long, default_value = "400")]
+    #[structopt(short = "h", long, default_value = "60")]
     depth: usize,
 
     #[structopt(short = "n", long, default_value = "4000")]
@@ -54,10 +54,11 @@ struct SlimeApp {
     sim: SlimeSim,
     gb: GraphicsBuilder,
     record: RecordFile,
+    camera: MultiPlatformCamera,
 }
 
 impl App<SlimeArgs> for SlimeApp {
-    fn init(ctx: &mut Context, _: &mut Platform, args: SlimeArgs) -> Result<Self> {
+    fn init(ctx: &mut Context, platform: &mut Platform, args: SlimeArgs) -> Result<Self> {
         let sim = SlimeSim::new(
             args.width,
             args.height,
@@ -76,6 +77,7 @@ impl App<SlimeArgs> for SlimeApp {
         let indices = ctx.indices(&gb.indices, false)?;
 
         Ok(Self {
+            camera: MultiPlatformCamera::new(platform),
             record,
             verts,
             indices,
@@ -98,15 +100,14 @@ impl App<SlimeArgs> for SlimeApp {
         draw_sim(&mut self.gb, &self.sim);
         ctx.update_vertices(self.verts, &self.gb.vertices)?;
 
-        // Camera and drawing
-        simple_ortho_cam_ctx(ctx, platform);
-
         Ok(vec![DrawCmd::new(self.verts).indices(self.indices)])
     }
 
     /// Called once per event
-    fn event(&mut self, _ctx: &mut Context, platform: &mut Platform, event: Event) -> Result<()> {
-
+    fn event(&mut self, ctx: &mut Context, platform: &mut Platform, mut event: Event) -> Result<()> {
+        if self.camera.handle_event(&mut event) {
+            ctx.set_camera_prefix(self.camera.get_prefix())
+        }
 
         match (event, platform) {
             (
