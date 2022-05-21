@@ -9,7 +9,7 @@ default-run = "gui"
 [dependencies]
 #idek_basics = { path = "../idek_basics" }
 idek_basics = { git = "http://github.com/Masterchef365/idek-basics.git", rev = "6a3e9c74" }
-rand = "0.8"
+rand = { version = "0.8", features = ["small_rng"] }
 structopt = { version = "0.3", default-features = false }
 rayon = "1.5"
 serde = { version = "1", features = ["derive"] }

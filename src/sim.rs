@@ -26,7 +26,7 @@ pub struct SlimeConfig {
     deposit_rate: f32,
 
     /// Slime movement speed
-    #[structopt(short = "m", long, default_value = "1.0")]
+    #[structopt(short = "m", long, default_value = "0.1")]
     move_speed: f32,
 
     /// Sample distance

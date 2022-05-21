@@ -5,12 +5,14 @@ use idek_basics::{
     idek::{self, simple_ortho_cam_ctx},
     GraphicsBuilder,
 };
+use rand::distributions::Uniform;
 use slime::{
     record::{record_frame, RecordFile},
     sim::*,
 };
 use std::path::PathBuf;
 use structopt::StructOpt;
+use rand::prelude::*;
 
 fn main() -> Result<()> {
     let args = SlimeArgs::from_args();
@@ -167,6 +169,12 @@ fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
 
     let base = gb.indices.len() as u32;
 
+    //let fiddle = 0.25;
+    let fiddle = 0.125;
+    let fiddle = Uniform::new(-fiddle, fiddle);
+
+    let mut rng = SmallRng::seed_from_u64(243908234);
+
     for k in 0..n_length_verts {
         let z = map(k as f32 / n_length_verts as f32);
         for j in 0..n_height_verts {
@@ -177,8 +185,12 @@ fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
                 if i < medium.width() && j < medium.height() && k < medium.length() {
                     let v = medium[(i, j, k)];
 
-                    let v = v * 4.;
+                    let v = v * 2.;
                     let color = [v * 0.1, v * 0.5, v];
+
+                    let x = x + fiddle.sample(&mut rng);
+                    let y = y + fiddle.sample(&mut rng);
+                    let z = z + fiddle.sample(&mut rng);
 
                     let idx = gb.push_vertex(Vertex::new([x, y, z], color));
                     gb.push_indices(&[idx]);
