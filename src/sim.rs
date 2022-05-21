@@ -34,7 +34,7 @@ pub struct SlimeConfig {
     sample_dist: f32,
 
     /// Dive rate
-    #[structopt(short = "u", long, default_value = "1.0")]
+    #[structopt(short = "p", long, default_value = "1.0")]
     dive_rate: f32,
 
     /// Diffusion rate of the medium
@@ -73,17 +73,17 @@ impl SlimeSim {
     pub fn new(
         width: usize,
         height: usize,
-        depth: usize,
+        length: usize,
         n_particles: usize,
         mut rng: impl Rng,
     ) -> Self {
-        let factory = SlimeFactory::new(width, height, depth);
+        let factory = SlimeFactory::new(width, height, length);
 
         let slime = (0..n_particles).map(|_| factory.slime(&mut rng)).collect();
 
         let front = SlimeData {
             slime,
-            medium: Array3D::new(width, height, depth),
+            medium: Array3D::new(width, height, length),
         };
 
         Self {

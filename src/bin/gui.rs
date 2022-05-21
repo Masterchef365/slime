@@ -28,8 +28,8 @@ struct SlimeArgs {
     #[structopt(short = "h", long, default_value = "60")]
     height: usize,
 
-    #[structopt(short = "h", long, default_value = "60")]
-    depth: usize,
+    #[structopt(short = "l", long, default_value = "60")]
+    length: usize,
 
     #[structopt(short = "n", long, default_value = "4000")]
     n_particles: usize,
@@ -65,7 +65,7 @@ impl App<SlimeArgs> for SlimeApp {
         let sim = SlimeSim::new(
             args.width,
             args.height,
-            args.depth,
+            args.length,
             args.n_particles,
             &mut rand::thread_rng(),
         );
@@ -159,14 +159,14 @@ fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
 
     let n_width_verts = medium.width() + 1;
     let n_height_verts = medium.height() + 1;
-    let n_depth_verts = medium.length() + 1;
+    let n_length_verts = medium.length() + 1;
 
     let map = |v| (v * 2. - 1.) * scale;
 
     let base = gb.indices.len() as u32;
 
-    for k in 0..n_depth_verts {
-        let z = map(k as f32 / n_depth_verts as f32);
+    for k in 0..n_length_verts {
+        let z = map(k as f32 / n_length_verts as f32);
         for j in 0..n_height_verts {
             let y = map(j as f32 / n_height_verts as f32);
             for i in 0..n_width_verts {
