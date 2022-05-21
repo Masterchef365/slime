@@ -1,3 +1,5 @@
+fn main(){}
+/*
 use anyhow::{Context, Result};
 use idek_basics::Array2D;
 use nalgebra::Vector2;
@@ -145,3 +147,4 @@ fn write_png(path: &Path, data: &[u8], width: u32, height: u32) -> Result<()> {
 
     Ok(())
 }
+*/

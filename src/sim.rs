@@ -1,9 +1,11 @@
-use idek_basics::Array2D;
-use nalgebra::{Rotation2, Vector1, Vector2};
+use idek_basics::Array3D;
+use nalgebra::{Rotation2, Vector1, Vector2, Vector3};
 use rand::{distributions::Uniform, prelude::*};
+use serde::{Deserialize, Serialize};
 use std::f32::consts::TAU;
 use structopt::StructOpt;
-use serde::{Serialize, Deserialize};
+
+type Pos = (isize, isize, isize);
 
 #[derive(Clone, Default, Debug, StructOpt)]
 pub struct SlimeConfig {
@@ -31,6 +33,10 @@ pub struct SlimeConfig {
     #[structopt(short = "u", long, default_value = "3.0")]
     sample_dist: f32,
 
+    /// Dive rate
+    #[structopt(short = "u", long, default_value = "1.0")]
+    dive_rate: f32,
+
     /// Diffusion rate of the medium
     #[structopt(short = "i", long, default_value = "0.1")]
     diffusion: f32,
@@ -38,15 +44,15 @@ pub struct SlimeConfig {
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct SlimeParticle {
-    pub position: Vector2<f32>,
+    pub position: Vector3<f32>,
     pub heading: Vector2<f32>,
-    pub origin: Vector2<f32>,
+    pub origin: Vector3<f32>,
     pub age: u32,
 }
 
 #[derive(Clone)]
 pub struct SlimeData {
-    pub medium: Array2D<f32>,
+    pub medium: Array3D<f32>,
     pub slime: Vec<SlimeParticle>,
 }
 
@@ -64,14 +70,20 @@ fn unit_circ(a: f32) -> Vector2<f32> {
 }
 
 impl SlimeSim {
-    pub fn new(width: usize, height: usize, n_particles: usize, mut rng: impl Rng) -> Self {
-        let factory = SlimeFactory::new(width, height);
+    pub fn new(
+        width: usize,
+        height: usize,
+        depth: usize,
+        n_particles: usize,
+        mut rng: impl Rng,
+    ) -> Self {
+        let factory = SlimeFactory::new(width, height, depth);
 
         let slime = (0..n_particles).map(|_| factory.slime(&mut rng)).collect();
 
         let front = SlimeData {
             slime,
-            medium: Array2D::new(width, height),
+            medium: Array3D::new(width, height, depth),
         };
 
         Self {
@@ -87,31 +99,35 @@ impl SlimeSim {
 
     pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
         // Diffusion and decay
-        for y in 0..self.front.medium.height() {
-            for x in 0..self.front.medium.width() {
-                let mut sum = 0.;
-                let mut n_parts = 0;
-                for i in -1..=1 {
-                    for j in -1..=1 {
-                        if let Some(v) =
-                            sample_array_isize(&self.front.medium, j + x as isize, i + y as isize)
-                        {
-                            sum += v;
-                            n_parts += 1;
+        for z in 0..self.front.medium.length() {
+            for y in 0..self.front.medium.height() {
+                for x in 0..self.front.medium.width() {
+                    let mut sum = 0.;
+                    let mut n_parts = 0;
+                    for i in -1..=1 {
+                        for j in -1..=1 {
+                            for k in -1..=1 {
+                                let sample_pos = (j + x as isize, i + y as isize, k + z as isize);
+                                if let Some(v) = sample_array_isize(&self.front.medium, sample_pos)
+                                {
+                                    sum += v;
+                                    n_parts += 1;
+                                }
+                            }
                         }
                     }
+
+                    let avg = sum / n_parts as f32;
+
+                    let pos = (x, y, z);
+                    let center = self.front.medium[pos];
+
+                    let diffuse = mix(center, avg, cfg.diffusion);
+
+                    let decayed = (1. - cfg.decay) * diffuse;
+
+                    self.back.medium[pos] = decayed;
                 }
-
-                let avg = sum / n_parts as f32;
-
-                let pos = (x, y);
-                let center = self.front.medium[pos];
-
-                let diffuse = mix(center, avg, cfg.diffusion);
-
-                let decayed = (1. - cfg.decay) * diffuse;
-
-                self.back.medium[pos] = decayed;
             }
         }
 
@@ -128,7 +144,7 @@ impl SlimeSim {
         for (b, f) in self.back.slime.iter_mut().zip(&self.front.slime) {
             // Sample the grid
             let [left, center, right] = [left_sensor_rot, unit_rot, right_sensor_rot]
-                .map(|r| f.position + r * f.heading * cfg.sample_dist)
+                .map(|r| f.position + (r * f.heading * cfg.sample_dist).push(0.))
                 .map(|p| sample_array_vect(&self.back.medium, p))
                 .map(|p| p.map(|p| self.front.medium[p]));
 
@@ -153,7 +169,7 @@ impl SlimeSim {
             let heading = rotation * f.heading;
 
             // Integrate position
-            let position = f.position + heading * cfg.move_speed * dt;
+            let position = f.position + (heading * cfg.move_speed * dt).push(cfg.dive_rate * dt);
 
             // Happy birthday!
             let age = f.age + 1;
@@ -176,43 +192,57 @@ impl SlimeSim {
     }
 }
 
-fn sample_array_isize<T: Copy>(arr: &Array2D<T>, x: isize, y: isize) -> Option<T> {
+fn sample_array_isize<T: Copy>(arr: &Array3D<T>, (x, y, z): Pos) -> Option<T> {
     let bounds = |x: isize, w: usize| {
         (x >= 0 && x < w as isize) //
             .then(|| x as usize)
     };
 
-    let pos = (bounds(x, arr.width())?, bounds(y, arr.height())?);
+    let pos = (
+        bounds(x, arr.width())?,
+        bounds(y, arr.height())?,
+        bounds(z, arr.length())?,
+    );
 
     Some(arr[pos])
 }
 
-fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
+fn sample_array_vect<T>(arr: &Array3D<T>, v: Vector3<f32>) -> Option<(usize, usize, usize)> {
     let bounds = |x: f32, w: usize| {
         (x.is_finite() && x >= 0. && x < w as f32) //
             .then(|| x as usize)
     };
 
-    Some((bounds(v.x, arr.width())?, bounds(v.y, arr.height())?))
+    Some((
+        bounds(v.x, arr.width())?,
+        bounds(v.y, arr.height())?,
+        bounds(v.z, arr.length())?,
+    ))
 }
 
 // Overengineered bullshit
 struct SlimeFactory {
     x: Uniform<f32>,
     y: Uniform<f32>,
+    z: Uniform<f32>,
     angle: Uniform<f32>,
 }
 
 impl SlimeFactory {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new(width: usize, height: usize, length: usize) -> Self {
         let x = Uniform::new(0.0, width as f32);
         let y = Uniform::new(0.0, height as f32);
+        let z = Uniform::new(0.0, length as f32);
         let angle = Uniform::new(0., TAU);
-        Self { x, y, angle }
+        Self { x, y, z, angle }
     }
 
     pub fn slime(&self, mut rng: impl Rng) -> SlimeParticle {
-        let origin = Vector2::new(self.x.sample(&mut rng), self.y.sample(&mut rng));
+        let origin = Vector3::new(
+            self.x.sample(&mut rng),
+            self.y.sample(&mut rng),
+            self.z.sample(&mut rng),
+        );
         SlimeParticle {
             position: origin,
             origin,
@@ -226,4 +256,3 @@ impl SlimeFactory {
 fn mix(a: f32, b: f32, t: f32) -> f32 {
     (1. - t) * a + t * b
 }
-

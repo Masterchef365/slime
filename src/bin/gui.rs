@@ -5,11 +5,11 @@ use idek_basics::{
     idek::{self, simple_ortho_cam_ctx},
     GraphicsBuilder,
 };
-use std::path::PathBuf;
 use slime::{
     record::{record_frame, RecordFile},
     sim::*,
 };
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 fn main() -> Result<()> {
@@ -27,6 +27,9 @@ struct SlimeArgs {
 
     #[structopt(short = "h", long, default_value = "400")]
     height: usize,
+
+    #[structopt(short = "h", long, default_value = "400")]
+    depth: usize,
 
     #[structopt(short = "n", long, default_value = "4000")]
     n_particles: usize,
@@ -58,6 +61,7 @@ impl App<SlimeArgs> for SlimeApp {
         let sim = SlimeSim::new(
             args.width,
             args.height,
+            args.depth,
             args.n_particles,
             &mut rand::thread_rng(),
         );
@@ -102,6 +106,8 @@ impl App<SlimeArgs> for SlimeApp {
 
     /// Called once per event
     fn event(&mut self, _ctx: &mut Context, platform: &mut Platform, event: Event) -> Result<()> {
+
+
         match (event, platform) {
             (
                 Event::Winit(winit::event::Event::WindowEvent {
@@ -128,5 +134,21 @@ impl SlimeApp {
 }
 
 fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
-    draw_grid(gb, &sim.frame().medium, |&v| [v; 3], 0.);
+    let base = gb.push_vertex(Vertex::new([-1.0, -1.0, -1.0], [0.0, 1.0, 1.0]));
+    gb.push_vertex(Vertex::new([1.0, -1.0, -1.0], [1.0, 0.0, 1.0]));
+    gb.push_vertex(Vertex::new([1.0, 1.0, -1.0], [1.0, 1.0, 0.0]));
+    gb.push_vertex(Vertex::new([-1.0, 1.0, -1.0], [0.0, 1.0, 1.0]));
+    gb.push_vertex(Vertex::new([-1.0, -1.0, 1.0], [1.0, 0.0, 1.0]));
+    gb.push_vertex(Vertex::new([1.0, -1.0, 1.0], [1.0, 1.0, 0.0]));
+    gb.push_vertex(Vertex::new([1.0, 1.0, 1.0], [0.0, 1.0, 1.0]));
+    gb.push_vertex(Vertex::new([-1.0, 1.0, 1.0], [1.0, 0.0, 1.0]));
+
+    let indices = [
+        3, 1, 0, 2, 1, 3, 2, 5, 1, 6, 5, 2, 6, 4, 5, 7, 4, 6, 7, 0, 4, 3, 0, 7, 7, 2, 3, 6, 2, 7,
+        0, 5, 4, 1, 5, 0,
+    ];
+
+    gb.push_indices(&indices.map(|i| i + base));
+
+    //draw_grid(gb, &sim.frame().medium, |&v| [v; 3], 0.);
 }
