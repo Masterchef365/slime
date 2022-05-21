@@ -5,11 +5,11 @@ use idek_basics::{
     idek::{self, simple_ortho_cam_ctx},
     GraphicsBuilder,
 };
-use std::path::PathBuf;
 use slime::{
     record::{record_frame, RecordFile},
     sim::*,
 };
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 fn main() -> Result<()> {
@@ -50,7 +50,7 @@ struct SlimeApp {
     args: SlimeArgs,
     sim: SlimeSim,
     gb: GraphicsBuilder,
-    record: RecordFile,
+    record: Option<RecordFile>,
 }
 
 impl App<SlimeArgs> for SlimeApp {
@@ -62,7 +62,10 @@ impl App<SlimeArgs> for SlimeApp {
             &mut rand::thread_rng(),
         );
 
-        let record = RecordFile::new(args.width, args.height);
+        let record = args
+            .record
+            .is_some()
+            .then(|| RecordFile::new(args.width, args.height));
 
         let mut gb = GraphicsBuilder::new();
 
@@ -84,7 +87,10 @@ impl App<SlimeArgs> for SlimeApp {
     fn frame(&mut self, ctx: &mut Context, platform: &mut Platform) -> Result<Vec<DrawCmd>> {
         // Timing
         for _ in 0..self.args.steps_per_frame {
-            record_frame(&mut self.record, &mut self.sim);
+            if let Some(record) = &mut self.record {
+                record_frame(record, &mut self.sim);
+            }
+
             self.sim
                 .step(&self.args.cfg, self.args.dt, &mut rand::thread_rng());
         }
@@ -121,8 +127,8 @@ impl App<SlimeArgs> for SlimeApp {
 
 impl SlimeApp {
     fn exit(&self) {
-        if let Some(path) = self.args.record.as_ref() {
-            self.record.save(&path).expect("Failed to save");
+        if let Some((record, path)) = self.record.as_ref().zip(self.args.record.as_ref()) {
+            record.save(&path).expect("Failed to save");
         }
     }
 }
