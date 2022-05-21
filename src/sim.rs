@@ -111,16 +111,26 @@ impl SlimeSim {
                     // TODO: break this out into a function. Don't nest so deep!
                     let mut sum = 0.;
                     let mut n_parts = 0;
-                    for i in -1..=1 {
-                        for j in -1..=1 {
-                            for k in -1..=1 {
-                                let sample_pos = (j + x as isize, i + y as isize, k + z as isize);
-                                if let Some(v) = sample_array_isize(&self.front.medium, sample_pos)
-                                {
-                                    sum += v;
-                                    n_parts += 1;
-                                }
-                            }
+
+                    let off = [
+                        (0, 0, 0),
+
+                        (1, 0, 0),
+                        (-1, 0, 0),
+
+                        (0, 1, 0),
+                        (0, -1, 0),
+
+                        (0, 0, 1),
+                        (0, 0, -1),
+                    ];
+
+                    for (i, j, k) in off {
+                        let sample_pos = (j + x as isize, i + y as isize, k + z as isize);
+                        if let Some(v) = sample_array_isize(&self.front.medium, sample_pos)
+                        {
+                            sum += v;
+                            n_parts += 1;
                         }
                     }
 
