@@ -150,10 +150,10 @@ impl SlimeSim {
     }
 
     fn step_particles(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
-        let particle_tip = Vector3::z();
+        let particle_tip = Vector3::y();
 
-        let particle_yaw_axis = Unit::new_unchecked(Vector3::x());
-        let particle_pitch_axis = Unit::new_unchecked(Vector3::y());
+        let particle_yaw_axis = Unit::new_unchecked(Vector3::z());
+        let particle_pitch_axis = Unit::new_unchecked(Vector3::x());
 
         let yaw_sensor = UnitQuaternion::from_axis_angle(&particle_yaw_axis, cfg.sensor_spread);
         let pitch_sensor = UnitQuaternion::from_axis_angle(&particle_pitch_axis, cfg.sensor_spread);
@@ -252,8 +252,9 @@ struct SlimeFactory {
     x: Uniform<f32>,
     y: Uniform<f32>,
     z: Uniform<f32>,
-    theta: Uniform<f32>,
-    rho: Uniform<f32>,
+    //theta: Uniform<f32>,
+    //rho: Uniform<f32>,
+    unit: Uniform<f32>,
 }
 
 impl SlimeFactory {
@@ -262,15 +263,17 @@ impl SlimeFactory {
         let y = Uniform::new(0.0, height as f32);
         let z = Uniform::new(0.0, length as f32);
 
-        let theta = Uniform::new(0., PI);
-        let rho = Uniform::new(-PI, PI);
+        //let theta = Uniform::new(0., PI);
+        //let rho = Uniform::new(-PI, PI);
+        let unit = Uniform::new(-1., 1.);
 
         Self {
             x,
             y,
             z,
-            theta,
-            rho,
+            unit,
+            //theta,
+            //rho,
         }
     }
 
@@ -282,11 +285,19 @@ impl SlimeFactory {
         );
 
         // Depends on PARTICLE_TIP!
-        let heading = UnitQuaternion::from_euler_angles(
+        /*let heading = UnitQuaternion::from_euler_angles(
             self.theta.sample(&mut rng),
             self.rho.sample(&mut rng),
             0.,
+        );*/
+
+        let dir = Vector3::new(
+            self.unit.sample(&mut rng),
+            self.unit.sample(&mut rng),
+            self.unit.sample(&mut rng),
         );
+
+        let heading = UnitQuaternion::rotation_between(&Vector3::z(), &dir.normalize()).unwrap();
 
         SlimeParticle {
             position: origin,
