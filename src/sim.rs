@@ -164,9 +164,9 @@ impl SlimeSim {
         let (u, v) = self.fluid.uv_mut();
 
         let pos = (u.width() / 2, u.height() / 2);
-        let k = -250.;
-        u[pos] = k * (time * 3.).cos();
-        v[pos] = k * (time * 3.).sin();
+        let k = u.width() as f32;
+        u[pos] = -k * (time * 3.).cos();
+        v[pos] = -k * (time * 3.).sin();
 
         let fluid_dt = 1e-2;
         let visc = 0.0;
