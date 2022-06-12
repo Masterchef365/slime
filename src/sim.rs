@@ -152,6 +152,11 @@ impl SlimeSim {
             }
         }
 
+        // TODO: Slow hack!
+        let d = self.medium.density().clone();
+        self.medium.density_mut().data_mut().iter_mut().zip(d.data()).for_each(|(m, d)| *m -= *d * (1. - cfg.decay));
+
+        // Fluid sim
         let time: f32 = 1.;
         let (u, v) = self.fluid.uv_mut();
 
