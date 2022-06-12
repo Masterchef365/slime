@@ -59,6 +59,7 @@ pub struct SlimeSim {
     back: SlimeData,
     /// Slime factory
     factory: SlimeFactory,
+    time: f32,
 }
 
 fn unit_circ(a: f32) -> Vector2<f32> {
@@ -85,6 +86,7 @@ impl SlimeSim {
             back: front.clone(),
             front,
             factory,
+            time: 0.,
         }
     }
 
@@ -157,7 +159,8 @@ impl SlimeSim {
         self.medium.density_mut().data_mut().iter_mut().zip(d.data()).for_each(|(m, d)| *m -= *d * (1. - cfg.decay));
 
         // Fluid sim
-        let time: f32 = 1.;
+        self.time += 0.005;
+        let time: f32 = self.time as f32;
         let (u, v) = self.fluid.uv_mut();
 
         let pos = (u.width() / 2, u.height() / 2);

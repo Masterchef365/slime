@@ -1,4 +1,4 @@
 cargo run --release -- --record out.slm\
-    --n-particles 8000\
-    -w 1000 -h 1000
+    --n-particles 18000\
+    -w 250 -h 250
     
