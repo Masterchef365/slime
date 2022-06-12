@@ -150,15 +150,16 @@ impl SlimeApp {
     }
 }
 
-fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
-    draw_grid(gb, sim.frame().1, |&v| [v; 3], 0.);
+fn color(v: f32) -> [f32; 3] {
+    [0.3, 0.8, 1.0].map(|c| c * 2. * v)
 }
 
-fn write_sim_frame(path: &Path, (slime, medium): (&SlimeData, &Array2D<f32>)) -> Result<()> {
-    let color = [1., 0.5, 0.2];
+fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
+    draw_grid(gb, sim.frame().1, |&v| color(v), 0.);
+}
 
-    let val_to_color = |v: f32| color
-        .map(|c| (c * (v * 2.).clamp(0., 1.) * 256.) as u8);
+fn write_sim_frame(path: &Path, (_slime, medium): (&SlimeData, &Array2D<f32>)) -> Result<()> {
+    let val_to_color = |v: f32| color(v).map(|c| (c.sqrt().clamp(0., 1.) * 256.) as u8);
 
     let data: Vec<u8> = medium
         .data()

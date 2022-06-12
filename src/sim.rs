@@ -159,14 +159,16 @@ impl SlimeSim {
         self.medium.density_mut().data_mut().iter_mut().zip(d.data()).for_each(|(m, d)| *m -= *d * (1. - cfg.decay));
 
         // Fluid sim
-        self.time += 0.005;
-        let time: f32 = self.time as f32;
         let (u, v) = self.fluid.uv_mut();
+        let width = u.width() as f32;
+
+        self.time += std::f32::consts::PI / width;
+        let time: f32 = self.time as f32;
 
         let pos = (u.width() / 2, u.height() / 2);
-        let k = u.width() as f32;
-        u[pos] = -k * (time * 3.).cos();
-        v[pos] = -k * (time * 3.).sin();
+        let m = width / 4.;
+        u[pos] = -m * time.cos();
+        v[pos] = -m * time.sin();
 
         let fluid_dt = 1e-2;
         let visc = 0.0;
