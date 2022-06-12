@@ -1,3 +1,4 @@
+use fruid::{DensitySim, FluidSim};
 use idek_basics::Array2D;
 use nalgebra::{Rotation2, Vector1, Vector2};
 use rand::{distributions::Uniform, prelude::*};
@@ -46,11 +47,12 @@ pub struct SlimeParticle {
 
 #[derive(Clone)]
 pub struct SlimeData {
-    pub medium: Array2D<f32>,
     pub slime: Vec<SlimeParticle>,
 }
 
 pub struct SlimeSim {
+    fluid: FluidSim,
+    medium: DensitySim,
     /// The buffer to be presented to the user and read by the sim
     front: SlimeData,
     /// The buffer which is written to by the sim and swapped to front each frame
@@ -71,55 +73,39 @@ impl SlimeSim {
 
         let front = SlimeData {
             slime,
-            medium: Array2D::new(width, height),
         };
 
+        let medium = DensitySim::new(width, height);
+
+        let fluid = FluidSim::new(width, height);
+
         Self {
+            fluid,
+            medium,
             back: front.clone(),
             front,
             factory,
         }
     }
 
-    pub fn frame(&self) -> &SlimeData {
-        &self.front
+    pub fn frame(&self) -> (&SlimeData, &Array2D<f32>) {
+        (&self.front, self.medium.density())
     }
 
     pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
-        // Diffusion and decay
-        for y in 0..self.front.medium.height() {
-            for x in 0..self.front.medium.width() {
-                let mut sum = 0.;
-                let mut n_parts = 0;
-                for i in -1..=1 {
-                    for j in -1..=1 {
-                        if let Some(v) =
-                            sample_array_isize(&self.front.medium, j + x as isize, i + y as isize)
-                        {
-                            sum += v;
-                            n_parts += 1;
-                        }
-                    }
-                }
+        let fluid_dt = 1e-2;
+        let visc = 0.;
+        let diff = 0.;
 
-                let avg = sum / n_parts as f32;
-
-                let pos = (x, y);
-                let center = self.front.medium[pos];
-
-                let diffuse = mix(center, avg, cfg.diffusion);
-
-                let decayed = (1. - cfg.decay) * diffuse;
-
-                self.back.medium[pos] = decayed;
-            }
-        }
+        self.medium.density_mut().data_mut().fill(0.0);
+        self.fluid.step(fluid_dt, visc);
+        self.medium.step(self.fluid.uv(), fluid_dt, diff);
 
         // Some premature optimization
-        let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * dt);
+        let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * fluid_dt);
         let right_sensor_rot = left_sensor_rot.inverse();
 
-        let left_turn_rate = Rotation2::from_scaled_axis(Vector1::new(cfg.turn_speed) * dt);
+        let left_turn_rate = Rotation2::from_scaled_axis(Vector1::new(cfg.turn_speed) * fluid_dt);
         let right_turn_rate = left_turn_rate.inverse();
 
         let unit_rot = Rotation2::identity();
@@ -129,8 +115,8 @@ impl SlimeSim {
             // Sample the grid
             let [left, center, right] = [left_sensor_rot, unit_rot, right_sensor_rot]
                 .map(|r| f.position + r * f.heading * cfg.sample_dist)
-                .map(|p| sample_array_vect(&self.back.medium, p))
-                .map(|p| p.map(|p| self.front.medium[p]));
+                .map(|p| sample_array_vect(&self.medium.density(), p))
+                .map(|p| p.map(|p| self.medium.density()[p]));
 
             // Decide which way to go
             let lc = left.partial_cmp(&center);
@@ -153,14 +139,14 @@ impl SlimeSim {
             let heading = rotation * f.heading;
 
             // Integrate position
-            let position = f.position + heading * cfg.move_speed * dt;
+            let position = f.position + heading * cfg.move_speed * fluid_dt;
 
             // Happy birthday!
             let age = f.age + 1;
 
             // Drop some slime (or create a new particle if out of bounds)
-            if let Some(pos) = sample_array_vect(&self.back.medium, position) {
-                self.back.medium[pos] += cfg.deposit_rate * dt;
+            if let Some(pos) = sample_array_vect(&self.medium.density(), position) {
+                self.medium.density_mut()[pos] += cfg.deposit_rate * fluid_dt;
                 *b = SlimeParticle {
                     origin: f.origin,
                     position,
@@ -187,6 +173,8 @@ fn sample_array_isize<T: Copy>(arr: &Array2D<T>, x: isize, y: isize) -> Option<T
     Some(arr[pos])
 }
 
+/// If the given vector is within the boundaries of the array, return it's coordinates. Does not
+/// modify the array!
 fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
     let bounds = |x: f32, w: usize| {
         (x.is_finite() && x >= 0. && x < w as f32) //

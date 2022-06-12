@@ -134,5 +134,5 @@ impl SlimeApp {
 }
 
 fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
-    draw_grid(gb, &sim.frame().medium, |&v| [v; 3], 0.);
+    draw_grid(gb, sim.frame().1, |&v| [v; 3], 0.);
 }

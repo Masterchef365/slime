@@ -4,7 +4,7 @@ use crate::sim::{SlimeParticle, SlimeSim};
 use serde::{Serialize, Deserialize};
 
 pub fn record_frame(record: &mut RecordFile, sim: &SlimeSim) {
-    let slime = sim.frame().slime.clone();
+    let slime = sim.frame().0.slime.clone();
     record.frames.push(RecordFrame { slime });
 }
 
