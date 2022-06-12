@@ -93,19 +93,13 @@ impl SlimeSim {
     }
 
     pub fn step(&mut self, cfg: &SlimeConfig, dt: f32, mut rng: impl Rng) {
-        let fluid_dt = 1e-2;
-        let visc = 0.;
-        let diff = 0.;
-
         self.medium.density_mut().data_mut().fill(0.0);
-        self.fluid.step(fluid_dt, visc);
-        self.medium.step(self.fluid.uv(), fluid_dt, diff);
 
         // Some premature optimization
-        let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * fluid_dt);
+        let left_sensor_rot = Rotation2::from_scaled_axis(Vector1::new(cfg.sensor_spread) * dt);
         let right_sensor_rot = left_sensor_rot.inverse();
 
-        let left_turn_rate = Rotation2::from_scaled_axis(Vector1::new(cfg.turn_speed) * fluid_dt);
+        let left_turn_rate = Rotation2::from_scaled_axis(Vector1::new(cfg.turn_speed) * dt);
         let right_turn_rate = left_turn_rate.inverse();
 
         let unit_rot = Rotation2::identity();
@@ -139,14 +133,14 @@ impl SlimeSim {
             let heading = rotation * f.heading;
 
             // Integrate position
-            let position = f.position + heading * cfg.move_speed * fluid_dt;
+            let position = f.position + heading * cfg.move_speed * dt;
 
             // Happy birthday!
             let age = f.age + 1;
 
             // Drop some slime (or create a new particle if out of bounds)
             if let Some(pos) = sample_array_vect(&self.medium.density(), position) {
-                self.medium.density_mut()[pos] += cfg.deposit_rate * fluid_dt;
+                self.medium.density_mut()[pos] += cfg.deposit_rate * dt;
                 *b = SlimeParticle {
                     origin: f.origin,
                     position,
@@ -157,6 +151,21 @@ impl SlimeSim {
                 *b = self.factory.slime(&mut rng);
             }
         }
+
+        let time: f32 = 1.;
+        let (u, v) = self.fluid.uv_mut();
+
+        let pos = (u.width() / 2, u.height() / 2);
+        let k = -250.;
+        u[pos] = k * (time * 3.).cos();
+        v[pos] = k * (time * 3.).sin();
+
+        let fluid_dt = 1e-2;
+        let visc = 0.0;
+        let diff = 1e-10;
+
+        self.fluid.step(fluid_dt, visc);
+        self.medium.step(self.fluid.uv(), fluid_dt, diff);
 
         std::mem::swap(&mut self.front, &mut self.back);
     }

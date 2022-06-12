@@ -22,10 +22,10 @@ struct SlimeArgs {
     #[structopt(short = "t", long, default_value = "0.5")]
     dt: f32,
 
-    #[structopt(short = "w", long, default_value = "400")]
+    #[structopt(short = "w", long, default_value = "250")]
     width: usize,
 
-    #[structopt(short = "h", long, default_value = "400")]
+    #[structopt(short = "h", long, default_value = "250")]
     height: usize,
 
     #[structopt(short = "n", long, default_value = "4000")]
