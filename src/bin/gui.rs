@@ -6,6 +6,7 @@ use idek_basics::{
     idek::{self, simple_ortho_cam_ctx},
     GraphicsBuilder,
 };
+use nalgebra::Vector2;
 use slime::{
     record::{record_frame, RecordFile},
     sim::*,
@@ -24,13 +25,13 @@ struct SlimeArgs {
     #[structopt(short = "t", long, default_value = "0.5")]
     dt: f32,
 
-    #[structopt(short = "w", long, default_value = "250")]
+    #[structopt(short = "w", long, default_value = "200")]
     width: usize,
 
-    #[structopt(short = "h", long, default_value = "250")]
+    #[structopt(short = "h", long, default_value = "200")]
     height: usize,
 
-    #[structopt(short = "n", long, default_value = "4000")]
+    #[structopt(short = "n", long, default_value = "25000")]
     n_particles: usize,
 
     #[structopt(long)]
@@ -151,12 +152,45 @@ impl SlimeApp {
 }
 
 fn color(v: f32) -> [f32; 3] {
-    [0.3, 0.8, 1.0].map(|c| c * 2. * v)
+    let v = v.clamp(0., 1.3);
+
+    let k = v - 0.276;
+    [
+        (0.3, 0.8),
+        (0.8, 1.0),
+        (1.0, 0.678),
+    ]
+    .map(|(a, b)| a * (1. - k) + b * k)
+    .map(|c| c * v)
 }
 
 fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
-    draw_grid(gb, sim.frame().1, |&v| color(v), 0.);
+    let (slime, medium) = sim.frame();
+    draw_grid(gb, medium, |&v| color(v), 0.5);
+    let c = 0.002;
+    let z = 0.0;
+
+    let color = [0.8, 0.0, 0.0];
+
+    for part in &slime.slime {
+        let pos = part.position / medium.width() as f32;
+        let pos = pos * 2. - Vector2::new(1., 1.);
+
+        let mut push = |x: f32, y: f32| 
+            gb.push_vertex(Vertex::new([x + pos.x, y + pos.y, z], color));
+
+        let tl = push(-c, -c);
+        let tr = push(c, -c);
+
+        let bl = push(-c, c);
+        let br = push(c, c);
+
+        gb.push_indices(&[bl, tr, tl, bl, br, tr]);
+        gb.push_indices(&[tl, tr, bl, tr, br, bl]);
+    }
 }
+
+
 
 fn write_sim_frame(path: &Path, (_slime, medium): (&SlimeData, &Array2D<f32>)) -> Result<()> {
     let val_to_color = |v: f32| color(v).map(|c| (c.sqrt().clamp(0., 1.) * 256.) as u8);
@@ -168,6 +202,14 @@ fn write_sim_frame(path: &Path, (_slime, medium): (&SlimeData, &Array2D<f32>)) -
         .map(val_to_color)
         .flatten()
         .collect();
+
+    //let mut image_u8 = Array2D::from_array(medium.width(), data);
+
+    /*
+    for particle in slime.slime {
+        particle.position
+    }
+    */
 
     // For reading and opening files
     use std::fs::File;

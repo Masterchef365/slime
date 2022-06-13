@@ -140,6 +140,8 @@ impl SlimeSim {
             // Happy birthday!
             let age = f.age + 1;
 
+            let mut newparticle = rng.gen_bool(0.01);
+
             // Drop some slime (or create a new particle if out of bounds)
             if let Some(pos) = sample_array_vect(&self.medium.density(), position) {
                 self.medium.density_mut()[pos] += cfg.deposit_rate * dt;
@@ -150,6 +152,10 @@ impl SlimeSim {
                     age,
                 };
             } else {
+                newparticle = true;
+            }
+
+            if newparticle {
                 *b = self.factory.slime(&mut rng);
             }
         }
@@ -166,7 +172,7 @@ impl SlimeSim {
         let time: f32 = self.time as f32;
 
         let pos = (u.width() / 2, u.height() / 2);
-        let m = width / 4.;
+        let m = width / 2.;
         u[pos] = -m * time.cos();
         v[pos] = -m * time.sin();
 
@@ -183,8 +189,9 @@ impl SlimeSim {
 
 fn sample_array_isize<T: Copy>(arr: &Array2D<T>, x: isize, y: isize) -> Option<T> {
     let bounds = |x: isize, w: usize| {
-        (x >= 0 && x < w as isize) //
-            .then(|| x as usize)
+        Some((x % w as isize) as usize)
+        //(x >= 0 && x < w as isize) //
+            //.then(|| x as usize)
     };
 
     let pos = (bounds(x, arr.width())?, bounds(y, arr.height())?);
@@ -194,7 +201,7 @@ fn sample_array_isize<T: Copy>(arr: &Array2D<T>, x: isize, y: isize) -> Option<T
 
 /// If the given vector is within the boundaries of the array, return it's coordinates. Does not
 /// modify the array!
-fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
+pub fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
     let bounds = |x: f32, w: usize| {
         (x.is_finite() && x >= 0. && x < w as f32) //
             .then(|| x as usize)
