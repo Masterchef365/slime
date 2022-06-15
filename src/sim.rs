@@ -43,6 +43,10 @@ pub struct SlimeConfig {
     /// Random death rate
     #[structopt(short = "q", long, default_value = "0.01")]
     death_rate: f64,
+
+    /// Emitter strength (multiple of width)
+    #[structopt(short = "g", long, default_value = "1.")]
+    emit: f32
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -182,7 +186,7 @@ impl SlimeSim {
         let time: f32 = self.time as f32;
 
         let pos = (u.width() / 2, u.height() / 2);
-        let m = 1. * width;// / 2.;
+        let m = cfg.emit * width;
         u[pos] = -m * time.cos();
         v[pos] = -m * time.sin();
 
