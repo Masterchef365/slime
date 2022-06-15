@@ -463,6 +463,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "fruid"
 version = "0.1.0"
+source = "git+https://github.com/Masterchef365/fruid.git?rev=8c2e8a1a9#8c2e8a1a9347b7ec68ad1a2864166572fecc723c"
 dependencies = [
  "anyhow",
  "idek_basics",
