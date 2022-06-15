@@ -137,6 +137,8 @@ impl SlimeSim {
             // Integrate position
             let position = f.position + heading * cfg.move_speed * dt;
 
+            let position = wraparound(self.medium.density(), position);
+
             // Happy birthday!
             let age = f.age + 1;
 
@@ -199,12 +201,18 @@ fn sample_array_isize<T: Copy>(arr: &Array2D<T>, x: isize, y: isize) -> Option<T
     Some(arr[pos])
 }
 
+pub fn wraparound<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Vector2<f32> {
+    Vector2::new(
+        v.x.rem_euclid(arr.width() as f32), 
+        v.y.rem_euclid(arr.height() as f32)
+    )
+}
+
 /// If the given vector is within the boundaries of the array, return it's coordinates. Does not
 /// modify the array!
 pub fn sample_array_vect<T>(arr: &Array2D<T>, v: Vector2<f32>) -> Option<(usize, usize)> {
     let bounds = |x: f32, w: usize| {
-        (x.is_finite() && x >= 0. && x < w as f32) //
-            .then(|| x as usize)
+        Some(x as usize % w)
     };
 
     Some((bounds(v.x, arr.width())?, bounds(v.y, arr.height())?))
