@@ -46,6 +46,9 @@ struct SlimeArgs {
     #[structopt(long)]
     img: Option<PathBuf>,
 
+    #[structopt(short = "l", long)]
+    show_slime: bool,
+
     #[structopt(flatten)]
     cfg: SlimeConfig,
 }
@@ -76,7 +79,7 @@ impl App<SlimeArgs> for SlimeApp {
 
         let mut gb = GraphicsBuilder::new();
 
-        draw_sim(&mut gb, &sim);
+        draw_sim(&mut gb, &sim, &args);
 
         let verts = ctx.vertices(&gb.vertices, true)?;
         let indices = ctx.indices(&gb.indices, false)?;
@@ -106,14 +109,13 @@ impl App<SlimeArgs> for SlimeApp {
         // Update view
         self.gb.clear();
 
-
         if let Some(base_path) = self.args.img.as_ref() {
             let name = format!("{:04}.png", self.frame);
             let path = base_path.join(name);
             write_sim_frame(&path, self.sim.frame())?;
         }
 
-        draw_sim(&mut self.gb, &self.sim);
+        draw_sim(&mut self.gb, &self.sim, &self.args);
         ctx.update_vertices(self.verts, &self.gb.vertices)?;
 
         // Camera and drawing
@@ -155,42 +157,44 @@ fn color(v: f32) -> [f32; 3] {
     let v = v.clamp(0., 1.3);
 
     let k = v - 0.276;
-    [
-        (0.3, 0.8),
-        (0.8, 1.0),
-        (1.0, 0.678),
-    ]
-    .map(|(a, b)| a * (1. - k) + b * k)
-    .map(|c| c * v)
+    [(0.3, 0.8), (0.8, 1.0), (1.0, 0.678)]
+        .map(|(a, b)| a * (1. - k) + b * k)
+        .map(|c| c * v)
 }
 
-fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim) {
+fn draw_sim(gb: &mut GraphicsBuilder, sim: &SlimeSim, cfg: &SlimeArgs) {
     let (slime, medium) = sim.frame();
     draw_grid(gb, medium, |&v| color(v), 0.5);
-    let c = 0.002;
-    let z = 0.0;
+    if cfg.show_slime {
+        draw_particles(gb, medium.width(), slime, 0., 0.002, [0.8, 0.0, 0.0]);
+    }
+}
 
-    let color = [0.8, 0.0, 0.0];
-
-    for part in &slime.slime {
-        let pos = part.position / medium.width() as f32;
+fn draw_particles(
+    gb: &mut GraphicsBuilder,
+    width: usize,
+    sim: &SlimeData,
+    z: f32,
+    scale: f32,
+    color: [f32; 3],
+) {
+    for part in &sim.slime {
+        let pos = part.position / width as f32;
         let pos = pos * 2. - Vector2::new(1., 1.);
 
-        let mut push = |x: f32, y: f32| 
-            gb.push_vertex(Vertex::new([x + pos.x, y + pos.y, z], color));
+        let mut push =
+            |x: f32, y: f32| gb.push_vertex(Vertex::new([x + pos.x, y + pos.y, z], color));
 
-        let tl = push(-c, -c);
-        let tr = push(c, -c);
+        let tl = push(-scale, -scale);
+        let tr = push(scale, -scale);
 
-        let bl = push(-c, c);
-        let br = push(c, c);
+        let bl = push(-scale, scale);
+        let br = push(scale, scale);
 
         gb.push_indices(&[bl, tr, tl, bl, br, tr]);
         gb.push_indices(&[tl, tr, bl, tr, br, bl]);
     }
 }
-
-
 
 fn write_sim_frame(path: &Path, (_slime, medium): (&SlimeData, &Array2D<f32>)) -> Result<()> {
     let val_to_color = |v: f32| color(v).map(|c| (c.sqrt().clamp(0., 1.) * 256.) as u8);
