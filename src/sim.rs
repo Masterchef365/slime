@@ -33,8 +33,16 @@ pub struct SlimeConfig {
     sample_dist: f32,
 
     /// Diffusion rate of the medium
-    #[structopt(short = "i", long, default_value = "0.1")]
+    #[structopt(short = "i", long, default_value = "1e-10")]
     diffusion: f32,
+
+    /// Viscosity of the medium
+    #[structopt(short = "v", long, default_value = "0.")]
+    viscosoty: f32,
+
+    /// Random death rate
+    #[structopt(short = "q", long, default_value = "0.01")]
+    death_rate: f64,
 }
 
 #[derive(Clone, Copy, Serialize, Deserialize)]
@@ -142,7 +150,7 @@ impl SlimeSim {
             // Happy birthday!
             let age = f.age + 1;
 
-            let mut newparticle = rng.gen_bool(0.01);
+            let mut newparticle = rng.gen_bool(cfg.death_rate);
 
             // Drop some slime (or create a new particle if out of bounds)
             if let Some(pos) = sample_array_vect(&self.medium.density(), position) {
@@ -174,16 +182,14 @@ impl SlimeSim {
         let time: f32 = self.time as f32;
 
         let pos = (u.width() / 2, u.height() / 2);
-        let m = width / 2.;
+        let m = 1. * width;// / 2.;
         u[pos] = -m * time.cos();
         v[pos] = -m * time.sin();
 
         let fluid_dt = 1e-2;
-        let visc = 0.0;
-        let diff = 1e-10;
 
-        self.fluid.step(fluid_dt, visc);
-        self.medium.step(self.fluid.uv(), fluid_dt, diff);
+        self.fluid.step(fluid_dt, cfg.viscosoty);
+        self.medium.step(self.fluid.uv(), fluid_dt, cfg.diffusion);
 
         std::mem::swap(&mut self.front, &mut self.back);
     }
