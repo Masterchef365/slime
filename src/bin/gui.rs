@@ -2,7 +2,6 @@ use idek::prelude::*;
 use idek::winit;
 use idek_basics::Array2D;
 use idek_basics::{
-    draw_array2d::draw_grid,
     idek::{self, simple_ortho_cam_ctx},
     GraphicsBuilder,
 };
@@ -230,4 +229,36 @@ fn write_sim_frame(path: &Path, (_slime, medium): (&SlimeData, &Array2D<f32>)) -
     writer.write_image_data(&data)?;
 
     Ok(())
+}
+
+pub fn draw_grid<T>(
+    builder: &mut GraphicsBuilder,
+    state: &Array2D<T>,
+    mut color: impl FnMut(&T) -> [f32; 3],
+    z: f32,
+) {
+    let cell_width = 2. / state.width() as f32;
+    let cell_height = 2. / state.height() as f32;
+
+    let ex = state.width() - 1;
+    let ey = state.height() - 1;
+
+    for i in 0..state.width() {
+        let i_frac = (i as f32 / ex as f32) * 2. - 1.;
+        for j in 0..state.height() {
+            let j_frac = (j as f32 / ey as f32) * 2. - 1.;
+
+            let color = color(&state[(i, j)]);
+
+            let tl = builder.push_vertex(Vertex::new([i_frac, j_frac, z], color));
+
+            if i < ex && j < ey {
+                let tr = tl + 1;
+                let bl = tl + state.width() as u32;
+                let br = bl + 1;
+
+                builder.push_indices(&[tl, tr, bl, tr, br, bl]);
+            }
+        }
+    }
 }
